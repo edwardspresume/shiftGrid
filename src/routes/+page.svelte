@@ -7,7 +7,7 @@
 
 <SiteHeader />
 
-<main class="container mx-auto">
+<main class="container mx-auto mt-10">
 	<header class="border-b border-white/10 p-3">
 		<WeekSelector />
 

@@ -3,12 +3,14 @@
 	import { CalendarDays, ChevronLeft, ChevronRight } from '@lucide/svelte';
 </script>
 
-<div class="flex items-center gap-2">
+<nav class="flex items-center gap-2">
 	<section
 		aria-label="Week selector"
-		class="flex items-center gap-2 rounded-lg border border-white/10 bg-[#1e1e20] p-1.5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.28)]"
+		class="flex items-center gap-1 rounded-lg border bg-card/60 p-1"
 	>
-		<Button size="icon" variant="outline" aria-label="Previous week">
+		<Button size="sm"
+					variant="outline"
+					class="h-9 px-3" aria-label="Previous week">
 			<ChevronLeft class="size-7" />
 		</Button>
 
@@ -17,10 +19,12 @@
 			<CalendarDays class="size-4" />
 		</Button>
 
-		<Button size="icon" variant="outline" aria-label="Next week">
+		<Button size="sm"
+					variant="outline"
+					class="h-9 px-3" aria-label="Next week">
 			<ChevronRight class="size-7" />
 		</Button>
 	</section>
 
 	<Button variant="outline">This Week</Button>
-</div>
+</nav>

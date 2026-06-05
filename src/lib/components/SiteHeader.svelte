@@ -5,7 +5,7 @@
 
 <header class="border-b">
 	<div class="container mx-auto flex items-center justify-between py-2">
-		<div class="flex items-center gap-3">
+		<div class="flex items-center gap-2">
 			<div class="grid size-8 place-items-center rounded-lg bg-blue-500 text-white">
 				<CalendarDays class="size-5" />
 			</div>
