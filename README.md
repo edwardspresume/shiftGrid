@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-pnpm dlx sv@0.15.4 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" playwright tailwindcss="plugins:forms,typography" sveltekit-adapter="adapter:vercel" drizzle="database:postgresql+postgresql:neon" better-auth="demo:password" paraglide="languageTags:en, es, ht+demo:yes" mcp="ide:other+setup:remote" --install pnpm shiftGrid
+pnpm dlx sv@0.15.4 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" playwright tailwindcss="plugins:forms,typography" sveltekit-adapter="adapter:vercel" drizzle="database:postgresql+postgresql:neon" better-auth="demo:password" mcp="ide:other+setup:remote" --install pnpm shiftGrid
 ```
 
 ## Developing
