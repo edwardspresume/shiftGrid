@@ -13,6 +13,10 @@ const config = {
 				...config,
 				include: [...config.include, '../drizzle.config.ts']
 			})
+		},
+
+		alias: {
+			$components: 'src/lib/components'
 		}
 	}
 };
