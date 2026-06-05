@@ -28,7 +28,7 @@
 			</Popover.Trigger>
 			<Popover.Content class="w-auto gap-3 p-3" align="center">
 				<div class="px-1">
-					<p class="font-heading text-sm leading-none font-semibold">Jump to date</p>
+					<p class="font-heading text-sm leading-none font-semibold">Choose Week</p>
 				</div>
 
 				<Calendar
