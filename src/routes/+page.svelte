@@ -1,7 +1,7 @@
 <script lang="ts">
-	import SiteHeader from '$lib/components/site-header.svelte';
+	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import WeekSelector from '$lib/components/week-selector.svelte';
+	import WeekSelector from '$lib/components/WeekSelector.svelte';
 	import { Plus } from '@lucide/svelte';
 </script>
 

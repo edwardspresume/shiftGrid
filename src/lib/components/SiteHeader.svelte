@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ThemeToggle from '$lib/components/theme-toggle.svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { CalendarDays } from '@lucide/svelte';
 </script>
 
