@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { Clock3, Plus } from '@lucide/svelte';
+	import { CalendarDays, Clock3, Plus, RefreshCw } from '@lucide/svelte';
 
 	type Shift = {
 		id: number;
@@ -139,12 +139,10 @@
 		{#each days as day (day.id)}
 			<section
 				aria-labelledby={day.id}
-				class="w-[21rem] rounded-2xl border border-white/10 bg-[#111114] shadow-sm"
+				class="w-[19.5rem] rounded-xl border bg-background shadow-sm"
 			>
-				<header
-					class="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5"
-				>
-					<h2 id={day.id} class="font-heading text-lg font-bold text-white">{day.label}</h2>
+				<header class="flex items-center justify-between gap-3 border-b px-3 py-2.5">
+					<h2 id={day.id} class="font-heading text-lg font-bold">{day.label}</h2>
 
 					<Button
 						size="icon"
@@ -158,37 +156,48 @@
 				<div class="space-y-3 p-3">
 					{#if day.shifts.length === 0}
 						<div
-							class="grid min-h-40 place-items-center rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 text-center"
+							class="grid min-h-40 place-items-center rounded-xl border border-dashed bg-muted/20 px-5 text-center"
 						>
-							<p class="text-sm font-medium text-white/40">No shifts scheduled</p>
+							<p class="text-sm font-medium text-muted-foreground">No shifts scheduled</p>
 						</div>
 					{:else}
 						{#each day.shifts as shift (shift.id)}
 							<article
-								class="space-y-3 rounded-xl border border-white/8 bg-[#1c1c20] p-3 shadow-sm"
+								class="space-y-3 rounded-xl bg-blue-200 p-3 shadow-sm transition-shadow duration-200 hover:shadow-lg dark:bg-card"
 							>
 								<header>
-									<h3 class="text-lg font-bold text-white">{shift.name}</h3>
-									<p class="mt-0.5 text-xs font-semibold tracking-wide text-white/45">
+									<h3 class="text-lg font-bold text-black dark:text-gray-100">{shift.name}</h3>
+									<p
+										class="mt-1 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground"
+									>
+										{#if shift.frequency === 'Weekly'}
+											<RefreshCw class="size-3.5" />
+										{:else}
+											<CalendarDays class="size-3.5" />
+										{/if}
 										{shift.frequency}
 									</p>
 								</header>
 
-								<div class="rounded-lg border border-white/10 bg-black/10 p-3">
+								<div class="rounded-lg border bg-background/55 p-3 dark:bg-background/35">
 									<div class="flex items-start gap-2.5">
-										<Clock3 class="mt-0.5 size-4 shrink-0 text-blue-400" />
+										<Clock3 class="mt-0.5 size-4 shrink-0 text-blue-600 dark:text-blue-400" />
 										<div class="min-w-0">
-											<p class="text-sm font-semibold text-white">{shift.time}</p>
-											<p class="mt-1 text-xs font-medium text-white/45">{shift.hours} total</p>
+											<p class="text-sm font-semibold">{shift.time}</p>
+											<p class="mt-1 text-xs font-medium text-muted-foreground">
+												{shift.hours} total
+											</p>
 										</div>
 									</div>
 								</div>
 
-								<div class="border-t border-white/8 pt-3">
-									<p class="text-[0.68rem] font-bold tracking-[0.14em] text-white/35 uppercase">
+								<div class="border-t pt-3">
+									<p
+										class="text-[0.68rem] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+									>
 										Notes
 									</p>
-									<p class="mt-1 text-sm leading-relaxed text-white/65">{shift.notes}</p>
+									<p class="mt-1 text-sm leading-relaxed text-foreground/75">{shift.notes}</p>
 								</div>
 							</article>
 						{/each}
