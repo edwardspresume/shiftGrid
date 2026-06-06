@@ -8,7 +8,7 @@
 	let selectedDate: DateValue | undefined = $state();
 </script>
 
-<nav class="flex items-center gap-2">
+<nav class="flex items-stretch gap-2">
 	<section
 		aria-label="Week selector"
 		class="flex items-center gap-1.5 rounded-lg border bg-card/60 p-1"
@@ -50,5 +50,5 @@
 		</Button>
 	</section>
 
-	<Button variant="outline">This Week</Button>
+	<Button variant="outline" class='h-auto'>This Week</Button>
 </nav>

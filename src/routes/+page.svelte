@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
+	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
 	import { Plus } from '@lucide/svelte';
@@ -7,7 +8,7 @@
 
 <SiteHeader />
 
-<main class="container mx-auto mt-10">
+<main class="container mx-auto mt-6">
 	<header class="border-b border-white/10 p-3">
 		<WeekSelector />
 
@@ -30,4 +31,6 @@
 			</Button>
 		</section>
 	</header>
+
+	<ShiftWeekGrid />
 </main>
