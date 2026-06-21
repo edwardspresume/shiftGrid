@@ -1,6 +1,6 @@
 <script lang="ts">
-	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
+	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
 	import { Plus } from '@lucide/svelte';
@@ -9,24 +9,21 @@
 <SiteHeader />
 
 <main class="container mx-auto mt-6">
-	<header class="border-b border-white/10 p-3">
+	<header class="border-b pb-4">
 		<WeekSelector />
 
-		<section class="flex items-center justify-between gap-4 p-4">
+		<section class="mt-4 flex items-center justify-between gap-4">
 			<div>
-				<p class="text-sm font-semibold text-white/55">Total hours this week:</p>
+				<p class="text-sm font-semibold">Total hours this week:</p>
 				<div class="mt-1 flex items-baseline gap-2">
 					<p class="text-3xl leading-none font-black">38.5h</p>
-					<span class="text-white/35">·</span>
-					<p class="text-base font-semibold text-white/65">6 shifts</p>
+					<span>·</span>
+					<p class="font-semibold">6 shifts</p>
 				</div>
 			</div>
 
-			<Button
-				variant="outline"
-				class="h-12 gap-2 rounded-[12px] border-white/20 bg-[#2a2a2d] px-4 text-base font-bold text-white hover:bg-[#323238]"
-			>
-				<Plus class="size-6 stroke-[2.5]" />
+			<Button variant="outline" size="lg">
+				<Plus class="size-6" />
 				Add Shift
 			</Button>
 		</section>
