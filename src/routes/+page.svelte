@@ -9,7 +9,7 @@
 <SiteHeader />
 
 <main class="container mx-auto mt-6">
-	<header class="border-b pb-4">
+	<header class="border-b pb-4 mb-8">
 		<WeekSelector />
 
 		<section class="mt-4 flex items-center justify-between gap-4">
