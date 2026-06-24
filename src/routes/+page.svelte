@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AddShiftForm from '$lib/components/AddShiftForm.svelte';
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -14,6 +15,22 @@
 
 	const weekStartsOn: WeekStartsOn = DEFAULT_WEEK_STARTS_ON;
 	let weekStart = $state(getCurrentWeekStart(weekStartsOn));
+	let isAddShiftFormOpen = $state(false);
+
+	const demoLocations = [
+		{
+			id: 1,
+			name: 'Northern Met',
+			color: '#16a34a',
+			address: '110 Northern Met Plaza'
+		},
+		{
+			id: 2,
+			name: 'Pine Valley',
+			color: '#2563eb',
+			address: '42 Pine Valley Road'
+		}
+	];
 
 	const summaryStats = [
 		{
@@ -48,6 +65,14 @@
 	function applySelectedDate(date: DateValue) {
 		weekStart = getWeekStart(date, weekStartsOn);
 	}
+
+	function openAddShiftForm() {
+		isAddShiftFormOpen = true;
+	}
+
+	function closeAddShiftForm() {
+		isAddShiftFormOpen = false;
+	}
 </script>
 
 <SiteHeader />
@@ -68,7 +93,7 @@
 				/>
 			</div>
 
-			<Button size="lg">
+			<Button size="lg" aria-expanded={isAddShiftFormOpen} onclick={openAddShiftForm}>
 				<Plus class="size-4" />
 				Add Shift
 			</Button>
@@ -92,6 +117,14 @@
 			{/each}
 		</section>
 	</header>
+
+	{#if isAddShiftFormOpen}
+		<AddShiftForm
+			locations={demoLocations}
+			initialDate={weekStart.toString()}
+			onCancel={closeAddShiftForm}
+		/>
+	{/if}
 
 	<ShiftWeekGrid {weekStart} />
 </main>
