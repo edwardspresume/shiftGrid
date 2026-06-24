@@ -3,6 +3,7 @@
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
 	import {
 		DEFAULT_WEEK_STARTS_ON,
@@ -118,13 +119,17 @@
 		</section>
 	</header>
 
-	{#if isAddShiftFormOpen}
-		<AddShiftForm
-			locations={demoLocations}
-			initialDate={weekStart.toString()}
-			onCancel={closeAddShiftForm}
-		/>
-	{/if}
+	<Dialog bind:open={isAddShiftFormOpen}>
+		<DialogContent
+			class="max-h-[min(44rem,calc(100dvh-2rem))] max-w-5xl gap-0 overflow-hidden p-0 sm:max-w-5xl"
+		>
+			<AddShiftForm
+				locations={demoLocations}
+				initialDate={weekStart.toString()}
+				onCancel={closeAddShiftForm}
+			/>
+		</DialogContent>
+	</Dialog>
 
 	<ShiftWeekGrid {weekStart} />
 </main>
