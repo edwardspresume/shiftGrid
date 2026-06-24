@@ -10,3 +10,8 @@
 - Use `pnpm test:e2e:ui` for local interactive Playwright review when helpful.
 - Keep durable regression coverage in committed `*.e2e.ts` files rather than only doing ad-hoc browser checks.
 - Prefer user-facing Playwright locators such as roles, labels, text, and test ids over CSS selectors tied to layout internals.
+
+## App Context
+
+- Keep `docs/app-context.md` up to date with relevant changes to user-visible functionality, scheduling rules, data model shape, and important source ownership.
+- Treat `docs/app-context.md` as concise context for coding agents first and lightweight human documentation second.

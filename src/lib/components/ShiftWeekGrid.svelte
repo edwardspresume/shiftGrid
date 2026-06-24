@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import type { ScheduledShift } from '$lib/schedule/shifts.remote';
 	import { formatDayLabel, getWeekDays } from '$lib/schedule/week';
 	import type { CalendarDate } from '@internationalized/date';
-	import { Clock3, Plus, RefreshCw } from '@lucide/svelte';
+	import { Clock3, MoreVertical, Pencil, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
 
 	type ShiftDay = {
 		id: string;
@@ -14,11 +15,13 @@
 	let {
 		weekStart,
 		shifts,
-		onAddShift
+		onAddShift,
+		onEditShift
 	}: {
 		weekStart: CalendarDate;
 		shifts: ScheduledShift[];
 		onAddShift: (shiftDate: string) => void;
+		onEditShift: (shift: ScheduledShift) => void;
 	} = $props();
 
 	const days: ShiftDay[] = $derived(
@@ -74,16 +77,45 @@
 							class="rounded-lg border border-l-4 bg-background p-3 shadow-sm transition-colors duration-200 hover:bg-muted/35"
 							style:border-left-color={shift.locationColor}
 						>
-							<header class="space-y-1.5">
-								<h3 class="truncate text-sm font-bold">
-									{shift.location}
-								</h3>
-								<p
-									class="flex items-center gap-1.5 text-[0.7rem] font-semibold text-muted-foreground uppercase"
-								>
-									<RefreshCw class="size-3" />
-									{shift.frequency}
-								</p>
+							<header class="flex items-start justify-between gap-2">
+								<div class="min-w-0 space-y-1.5">
+									<h3 class="truncate text-sm font-bold">
+										{shift.location}
+									</h3>
+									<p
+										class="flex items-center gap-1.5 text-[0.7rem] font-semibold text-muted-foreground uppercase"
+									>
+										<RefreshCw class="size-3 shrink-0" />
+										<span class="truncate">{shift.frequency}</span>
+									</p>
+								</div>
+
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										{#snippet child({ props })}
+											<Button
+												{...props}
+												variant="ghost"
+												size="icon-xs"
+												class="-mt-1 shrink-0"
+												aria-label="Shift actions for {shift.location} {shift.time}"
+											>
+												<MoreVertical class="size-4" />
+											</Button>
+										{/snippet}
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="end">
+										<DropdownMenu.Item onSelect={() => onEditShift(shift)}>
+											<Pencil class="size-4" />
+											Edit
+										</DropdownMenu.Item>
+										<DropdownMenu.Separator />
+										<DropdownMenu.Item disabled variant="destructive">
+											<Trash2 class="size-4" />
+											Delete
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
 							</header>
 
 							<div class="mt-3 flex items-start gap-2 border-t pt-3">

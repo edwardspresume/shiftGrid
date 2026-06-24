@@ -18,26 +18,25 @@
 		recurrenceFrequencyValues
 	} from '$lib/schedule/constants';
 	import { parseCanonicalDate } from '$lib/schedule/date';
-	import { addShift, getSchedule, type LocationOption } from '$lib/schedule/shifts.remote';
 	import {
-		DEFAULT_END_TIME,
-		DEFAULT_START_TIME,
-		formatClockTime,
-		formatCompactHours,
-		getShiftHours
-	} from '$lib/schedule/time';
+		editShift,
+		getSchedule,
+		type LocationOption,
+		type ScheduledShift
+	} from '$lib/schedule/shifts.remote';
+	import { formatClockTime, formatCompactHours, getShiftHours } from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
 
 	let {
 		locations,
-		initialDate,
+		shift,
 		visibleWeekStart,
 		currentWeekQuery,
 		onCancel
 	}: {
 		locations: LocationOption[];
-		initialDate: string;
+		shift: ScheduledShift;
 		visibleWeekStart: string;
 		currentWeekQuery: string | null;
 		onCancel: () => void;
@@ -49,41 +48,43 @@
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground disabled:opacity-70';
 	const labelClass = 'text-xs font-semibold text-muted-foreground uppercase';
 	const issueClass = 'text-xs font-medium text-destructive';
-
-	const defaultLocationId = $derived(locations[0]?.id.toString() ?? '');
-	const defaultFormKey = $derived(`${initialDate}:${defaultLocationId}`);
+	const defaultLocationId = $derived(shift.locationId.toString());
+	const defaultFormKey = $derived(`${shift.ruleId}:${shift.baseShiftDate}:${shift.shiftDate}`);
 	const activeLocationId = $derived(
-		String(addShift.fields.locationId.value() || defaultLocationId)
+		String(editShift.fields.locationId.value() || defaultLocationId)
 	);
-	const startTime = $derived(String(addShift.fields.startTime.value() || DEFAULT_START_TIME));
-	const endTime = $derived(String(addShift.fields.endTime.value() || DEFAULT_END_TIME));
+	const startTime = $derived(String(editShift.fields.startTime.value() || shift.startTime));
+	const endTime = $derived(String(editShift.fields.endTime.value() || shift.endTime));
 	const breakMinutes = $derived(
-		String(addShift.fields.breakMinutes.value() || breakMinuteOptions[0])
+		String(editShift.fields.breakMinutes.value() || shift.breakMinutes)
 	);
 	const recurrenceFrequency = $derived(
-		String(addShift.fields.recurrenceFrequency.value() || recurrenceFrequencyValues[0])
+		String(editShift.fields.recurrenceFrequency.value() || shift.recurrenceFrequency)
 	);
 	const isRecurring = $derived(recurrenceFrequency !== 'none');
 	const selectedLocation = $derived(
-		locations.find((location) => location.id.toString() === activeLocationId) ?? locations[0]
+		locations.find((location) => location.id.toString() === activeLocationId) ??
+			locations.find((location) => location.id === shift.locationId) ??
+			locations[0]
 	);
 	const defaultFormValues = $derived({
-		locationId: defaultLocationId,
-		shiftDate: initialDate,
-		startTime: DEFAULT_START_TIME,
-		endTime: DEFAULT_END_TIME,
-		breakMinutes: breakMinuteOptions[0],
-		recurrenceFrequency: recurrenceFrequencyValues[0],
-		recurrenceUntil: '',
-		recurrenceDays: [getRecurrenceDayValue(initialDate)],
-		notes: ''
+		id: shift.ruleId.toString(),
+		locationId: shift.locationId.toString(),
+		shiftDate: shift.baseShiftDate,
+		startTime: shift.startTime,
+		endTime: shift.endTime,
+		breakMinutes: shift.breakMinutes.toString() as (typeof breakMinuteOptions)[number],
+		recurrenceFrequency: shift.recurrenceFrequency,
+		recurrenceUntil: shift.recurrenceUntil ?? '',
+		recurrenceDays: getRecurrenceDayValues(shift),
+		notes: shift.notes ?? ''
 	});
 
 	$effect(() => {
 		if (initializedFor === defaultFormKey) return;
 
 		initializedFor = defaultFormKey;
-		addShift.fields.set(defaultFormValues);
+		editShift.fields.set(defaultFormValues);
 	});
 
 	const totalHours = $derived(getShiftHours(startTime, endTime, Number(breakMinutes)));
@@ -92,7 +93,7 @@
 		`${formatClockTime(startTime)} - ${formatClockTime(endTime)}`
 	);
 	const repeatUntilMax = $derived(
-		parseCanonicalDate(initialDate)?.add({ years: RECURRENCE_LIMIT_YEARS }).toString()
+		parseCanonicalDate(shift.baseShiftDate)?.add({ years: RECURRENCE_LIMIT_YEARS }).toString()
 	);
 
 	function getRecurrenceDayValue(dateValue: string) {
@@ -104,22 +105,32 @@
 			.toString() as (typeof recurrenceDayValues)[number];
 	}
 
+	function getRecurrenceDayValues(value: ScheduledShift) {
+		if (value.recurrenceDays && value.recurrenceDays.length > 0) {
+			return value.recurrenceDays.map(
+				(day) => day.toString() as (typeof recurrenceDayValues)[number]
+			);
+		}
+
+		return [getRecurrenceDayValue(value.baseShiftDate)];
+	}
+
 	function resetForm(element: HTMLFormElement) {
 		element.reset();
-		addShift.fields.set(defaultFormValues);
+		editShift.fields.set(defaultFormValues);
 	}
 </script>
 
 <form
-	{...addShift.enhance(async (form) => {
-		const submittedShiftDate = String(form.fields.shiftDate.value() || initialDate);
+	{...editShift.enhance(async (form) => {
+		const submittedShiftDate = String(form.fields.shiftDate.value() || shift.baseShiftDate);
 		const submitted = await form.submit().updates(getSchedule(currentWeekQuery));
 		if (!submitted) return;
 
 		const submittedCalendarDate = parseCanonicalDate(submittedShiftDate);
 		const submittedWeekStart = submittedCalendarDate
 			? getWeekStart(submittedCalendarDate, DEFAULT_WEEK_STARTS_ON).toString()
-			: initialDate;
+			: shift.baseShiftDate;
 
 		resetForm(form.element);
 		onCancel();
@@ -132,10 +143,12 @@
 		}
 	})}
 >
+	<input {...editShift.fields.id.as('hidden', shift.ruleId.toString())} />
+
 	<DialogHeader class="border-b p-4">
-		<DialogTitle>Add shift</DialogTitle>
+		<DialogTitle>Edit shift</DialogTitle>
 		<DialogDescription class="sr-only">
-			Create a scheduled shift with location, date, time, break, recurrence, and notes.
+			Update a scheduled shift with location, date, time, break, recurrence, and notes.
 		</DialogDescription>
 		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
 	</DialogHeader>
@@ -149,7 +162,7 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
-						{...addShift.fields.locationId.as('select', defaultLocationId)}
+						{...editShift.fields.locationId.as('select', defaultLocationId)}
 						class={`${fieldClass} pl-9`}
 						required
 						disabled={locations.length === 0}
@@ -163,7 +176,7 @@
 						{/if}
 					</select>
 				</span>
-				{#each addShift.fields.locationId.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.locationId.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -175,13 +188,12 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						{...addShift.fields.shiftDate.as('date', initialDate)}
+						{...editShift.fields.shiftDate.as('date', shift.baseShiftDate)}
 						class={`${fieldClass} pl-9`}
 						required
-						readonly
 					/>
 				</span>
-				{#each addShift.fields.shiftDate.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.shiftDate.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -193,7 +205,10 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
-						{...addShift.fields.breakMinutes.as('select', breakMinuteOptions[0])}
+						{...editShift.fields.breakMinutes.as(
+							'select',
+							shift.breakMinutes.toString() as (typeof breakMinuteOptions)[number]
+						)}
 						class={`${fieldClass} pl-9`}
 					>
 						{#each breakMinuteOptions as option (option)}
@@ -201,7 +216,7 @@
 						{/each}
 					</select>
 				</span>
-				{#each addShift.fields.breakMinutes.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.breakMinutes.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -213,12 +228,12 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						{...addShift.fields.startTime.as('time', DEFAULT_START_TIME)}
+						{...editShift.fields.startTime.as('time', shift.startTime)}
 						class={`${fieldClass} pl-9`}
 						required
 					/>
 				</span>
-				{#each addShift.fields.startTime.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.startTime.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -230,12 +245,12 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						{...addShift.fields.endTime.as('time', DEFAULT_END_TIME)}
+						{...editShift.fields.endTime.as('time', shift.endTime)}
 						class={`${fieldClass} pl-9`}
 						required
 					/>
 				</span>
-				{#each addShift.fields.endTime.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.endTime.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -247,7 +262,7 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
-						{...addShift.fields.recurrenceFrequency.as('select', recurrenceFrequencyValues[0])}
+						{...editShift.fields.recurrenceFrequency.as('select', shift.recurrenceFrequency)}
 						class={`${fieldClass} pl-9`}
 					>
 						{#each recurrenceFrequencyValues as option (option)}
@@ -255,7 +270,7 @@
 						{/each}
 					</select>
 				</span>
-				{#each addShift.fields.recurrenceFrequency.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.recurrenceFrequency.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -263,14 +278,14 @@
 			<label class={['space-y-2', !isRecurring && 'opacity-60']}>
 				<span class={labelClass}>Repeat until</span>
 				<input
-					{...addShift.fields.recurrenceUntil.as('date')}
+					{...editShift.fields.recurrenceUntil.as('date')}
 					class={fieldClass}
 					disabled={!isRecurring}
 					required={isRecurring}
-					min={initialDate}
+					min={shift.baseShiftDate}
 					max={repeatUntilMax}
 				/>
-				{#each addShift.fields.recurrenceUntil.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.recurrenceUntil.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -283,7 +298,7 @@
 							class="flex min-h-10 items-center justify-center rounded-lg border bg-background px-2 text-xs font-semibold transition-colors has-checked:border-primary has-checked:bg-primary/10 has-checked:text-primary has-disabled:cursor-not-allowed has-disabled:bg-muted/60 has-disabled:text-muted-foreground"
 						>
 							<input
-								{...addShift.fields.recurrenceDays.as('checkbox', option)}
+								{...editShift.fields.recurrenceDays.as('checkbox', option)}
 								class="sr-only"
 								disabled={!isRecurring}
 							/>
@@ -291,7 +306,7 @@
 						</label>
 					{/each}
 				</div>
-				{#each addShift.fields.recurrenceDays.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.recurrenceDays.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</fieldset>
@@ -320,12 +335,12 @@
 						class="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground"
 					/>
 					<textarea
-						{...addShift.fields.notes.as('text')}
+						{...editShift.fields.notes.as('text')}
 						class={`${fieldClass} min-h-32 resize-none pl-9`}
 						placeholder="Coverage, handoff, or staffing notes"
 					></textarea>
 				</span>
-				{#each addShift.fields.notes.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.notes.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -334,8 +349,8 @@
 
 	<DialogFooter class="mx-0 mb-0 rounded-none border-t px-4 py-4">
 		<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
-		<Button type="submit" disabled={locations.length === 0 || addShift.pending > 0}>
-			{addShift.pending > 0 ? 'Adding...' : 'Add shift'}
+		<Button type="submit" disabled={locations.length === 0 || editShift.pending > 0}>
+			{editShift.pending > 0 ? 'Saving...' : 'Save changes'}
 		</Button>
 	</DialogFooter>
 </form>

@@ -1,55 +1,126 @@
 import * as v from 'valibot';
 
-import { breakMinuteOptions, recurrenceFrequencyValues } from '$lib/schedule/constants';
-import { isCanonicalDate } from '$lib/schedule/date';
+import {
+	breakMinuteOptions,
+	RECURRENCE_LIMIT_YEARS,
+	recurrenceDayValues,
+	recurrenceFrequencyValues
+} from '$lib/schedule/constants';
+import { isCanonicalDate, parseCanonicalDate } from '$lib/schedule/date';
 import { isClockInput } from '$lib/schedule/time';
 
 export const scheduleWeekSchema = v.nullish(v.string());
 
+const shiftFormFields = {
+	locationId: v.pipe(
+		v.string('Choose a location.'),
+		v.trim(),
+		v.transform(Number),
+		v.integer('Choose a location.'),
+		v.minValue(1, 'Choose a location.')
+	),
+	shiftDate: v.pipe(
+		v.string('Choose a shift date.'),
+		v.trim(),
+		v.minLength(1, 'Choose a shift date.'),
+		v.check(isCanonicalDate, 'Use a valid shift date.')
+	),
+	startTime: v.pipe(
+		v.string('Choose a start time.'),
+		v.trim(),
+		v.minLength(1, 'Choose a start time.'),
+		v.check(isClockInput, 'Use a valid start time.')
+	),
+	endTime: v.pipe(
+		v.string('Choose an end time.'),
+		v.trim(),
+		v.minLength(1, 'Choose an end time.'),
+		v.check(isClockInput, 'Use a valid end time.')
+	),
+	breakMinutes: v.pipe(
+		v.picklist(breakMinuteOptions, 'Choose a valid break.'),
+		v.transform(Number)
+	),
+	recurrenceFrequency: v.picklist(recurrenceFrequencyValues, 'Choose a valid recurrence.'),
+	recurrenceUntil: v.pipe(
+		v.fallback(v.string(), ''),
+		v.trim(),
+		v.transform((value): string | null => (value === '' ? null : value)),
+		v.check((value) => value === null || isCanonicalDate(value), 'Use a valid repeat end date.')
+	),
+	recurrenceDays: v.pipe(
+		v.optional(v.array(v.picklist(recurrenceDayValues)), []),
+		v.transform((values) =>
+			[...new Set(values)].map(Number).sort((first, second) => first - second)
+		)
+	),
+	notes: v.pipe(
+		v.fallback(v.string(), ''),
+		v.trim(),
+		v.maxLength(2000, 'Notes must be 2,000 characters or less.'),
+		v.transform((value): string | null => (value === '' ? null : value))
+	)
+};
+
+function isWithinRecurrenceLimit(shiftDate: string, recurrenceUntil: string | null) {
+	if (recurrenceUntil === null) return true;
+
+	const start = parseCanonicalDate(shiftDate);
+	const until = parseCanonicalDate(recurrenceUntil);
+	return !!start && !!until && until.compare(start.add({ years: RECURRENCE_LIMIT_YEARS })) <= 0;
+}
+
 export const addShiftSchema = v.pipe(
+	v.object(shiftFormFields),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, recurrenceUntil, shiftDate }) =>
+				recurrenceFrequency === 'none' || recurrenceUntil === null || recurrenceUntil >= shiftDate,
+			'Repeat until cannot be before the shift date.'
+		),
+		['recurrenceUntil']
+	),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, recurrenceUntil }) =>
+				recurrenceFrequency === 'none' || recurrenceUntil !== null,
+			'Choose a repeat end date.'
+		),
+		['recurrenceUntil']
+	),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, shiftDate, recurrenceUntil }) =>
+				recurrenceFrequency === 'none' || isWithinRecurrenceLimit(shiftDate, recurrenceUntil),
+			`Repeat until must be within ${RECURRENCE_LIMIT_YEARS} year of the shift date.`
+		),
+		['recurrenceUntil']
+	),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, recurrenceDays }) =>
+				recurrenceFrequency === 'none' || recurrenceDays.length > 0,
+			'Choose at least one repeat day.'
+		),
+		['recurrenceDays']
+	),
+	v.transform((data) => ({
+		...data,
+		recurrenceUntil: data.recurrenceFrequency === 'none' ? null : data.recurrenceUntil,
+		recurrenceDays: data.recurrenceFrequency === 'none' ? null : data.recurrenceDays
+	}))
+);
+
+export const editShiftSchema = v.pipe(
 	v.object({
-		locationId: v.pipe(
-			v.string('Choose a location.'),
+		id: v.pipe(
+			v.string('Choose a shift.'),
 			v.trim(),
 			v.transform(Number),
-			v.integer('Choose a location.'),
-			v.minValue(1, 'Choose a location.')
+			v.integer('Choose a shift.'),
+			v.minValue(1, 'Choose a shift.')
 		),
-		shiftDate: v.pipe(
-			v.string('Choose a shift date.'),
-			v.trim(),
-			v.minLength(1, 'Choose a shift date.'),
-			v.check(isCanonicalDate, 'Use a valid shift date.')
-		),
-		startTime: v.pipe(
-			v.string('Choose a start time.'),
-			v.trim(),
-			v.minLength(1, 'Choose a start time.'),
-			v.check(isClockInput, 'Use a valid start time.')
-		),
-		endTime: v.pipe(
-			v.string('Choose an end time.'),
-			v.trim(),
-			v.minLength(1, 'Choose an end time.'),
-			v.check(isClockInput, 'Use a valid end time.')
-		),
-		breakMinutes: v.pipe(
-			v.picklist(breakMinuteOptions, 'Choose a valid break.'),
-			v.transform(Number)
-		),
-		recurrenceFrequency: v.picklist(recurrenceFrequencyValues, 'Choose a valid recurrence.'),
-		recurrenceUntil: v.pipe(
-			v.fallback(v.string(), ''),
-			v.trim(),
-			v.transform((value): string | null => (value === '' ? null : value)),
-			v.check((value) => value === null || isCanonicalDate(value), 'Use a valid repeat end date.')
-		),
-		notes: v.pipe(
-			v.fallback(v.string(), ''),
-			v.trim(),
-			v.maxLength(2000, 'Notes must be 2,000 characters or less.'),
-			v.transform((value): string | null => (value === '' ? null : value))
-		)
+		...shiftFormFields
 	}),
 	v.forward(
 		v.check(
@@ -59,8 +130,33 @@ export const addShiftSchema = v.pipe(
 		),
 		['recurrenceUntil']
 	),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, recurrenceUntil }) =>
+				recurrenceFrequency === 'none' || recurrenceUntil !== null,
+			'Choose a repeat end date.'
+		),
+		['recurrenceUntil']
+	),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, shiftDate, recurrenceUntil }) =>
+				recurrenceFrequency === 'none' || isWithinRecurrenceLimit(shiftDate, recurrenceUntil),
+			`Repeat until must be within ${RECURRENCE_LIMIT_YEARS} year of the shift date.`
+		),
+		['recurrenceUntil']
+	),
+	v.forward(
+		v.check(
+			({ recurrenceFrequency, recurrenceDays }) =>
+				recurrenceFrequency === 'none' || recurrenceDays.length > 0,
+			'Choose at least one repeat day.'
+		),
+		['recurrenceDays']
+	),
 	v.transform((data) => ({
 		...data,
-		recurrenceUntil: data.recurrenceFrequency === 'none' ? null : data.recurrenceUntil
+		recurrenceUntil: data.recurrenceFrequency === 'none' ? null : data.recurrenceUntil,
+		recurrenceDays: data.recurrenceFrequency === 'none' ? null : data.recurrenceDays
 	}))
 );

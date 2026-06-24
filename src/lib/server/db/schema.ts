@@ -39,6 +39,7 @@ export const shifts = pgTable(
 		breakMinutes: integer('break_minutes').notNull().default(0),
 		recurrenceFrequency: recurrenceFrequency('recurrence_frequency').notNull().default('none'),
 		recurrenceUntil: date('recurrence_until'),
+		recurrenceDays: integer('recurrence_days').array(),
 		notes: text('notes'),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at')

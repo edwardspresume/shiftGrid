@@ -1,10 +1,11 @@
 <script lang="ts">
 	import AddShiftForm from '$lib/components/AddShiftForm.svelte';
+	import EditShiftForm from '$lib/components/EditShiftForm.svelte';
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
-	import { getLocations, getSchedule } from '$lib/schedule/shifts.remote';
+	import { getLocations, getSchedule, type ScheduledShift } from '$lib/schedule/shifts.remote';
 	import {
 		DEFAULT_WEEK_STARTS_ON,
 		getCurrentWeekStart,
@@ -22,7 +23,9 @@
 	const locations = $derived(await getLocations());
 	const weekStart: CalendarDate = $derived(parseDate(schedule.weekStart));
 	let isAddShiftFormOpen = $state(false);
+	let isEditShiftFormOpen = $state(false);
 	let selectedShiftDate = $state('');
+	let selectedShift = $state<ScheduledShift | null>(null);
 
 	const summaryStats = $derived([
 		{
@@ -72,6 +75,15 @@
 
 	function closeAddShiftForm() {
 		isAddShiftFormOpen = false;
+	}
+
+	function openEditShiftForm(shift: ScheduledShift) {
+		selectedShift = shift;
+		isEditShiftFormOpen = true;
+	}
+
+	function closeEditShiftForm() {
+		isEditShiftFormOpen = false;
 	}
 </script>
 
@@ -125,5 +137,26 @@
 		</DialogContent>
 	</Dialog>
 
-	<ShiftWeekGrid {weekStart} shifts={schedule.shifts} onAddShift={openAddShiftForm} />
+	<Dialog bind:open={isEditShiftFormOpen}>
+		<DialogContent
+			class="max-h-[min(44rem,calc(100dvh-2rem))] max-w-5xl gap-0 overflow-hidden p-0 sm:max-w-5xl"
+		>
+			{#if selectedShift}
+				<EditShiftForm
+					{locations}
+					shift={selectedShift}
+					visibleWeekStart={weekStart.toString()}
+					currentWeekQuery={page.url.searchParams.get('week')}
+					onCancel={closeEditShiftForm}
+				/>
+			{/if}
+		</DialogContent>
+	</Dialog>
+
+	<ShiftWeekGrid
+		{weekStart}
+		shifts={schedule.shifts}
+		onAddShift={openAddShiftForm}
+		onEditShift={openEditShiftForm}
+	/>
 </main>

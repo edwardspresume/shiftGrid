@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
 
 import { parseCanonicalDate } from './date';
-import { addShiftSchema } from './shiftValidation';
+import { addShiftSchema, editShiftSchema } from './shiftValidation';
 import {
 	formatClockTime,
 	getShiftHours,
@@ -34,6 +34,7 @@ describe('addShiftSchema', () => {
 			breakMinutes: 0,
 			recurrenceFrequency: 'none',
 			recurrenceUntil: null,
+			recurrenceDays: null,
 			notes: 'Coverage notes'
 		});
 	});
@@ -83,6 +84,87 @@ describe('addShiftSchema', () => {
 		});
 
 		expect(result.success).toBe(false);
+	});
+
+	it('requires a repeat end date for recurring shifts', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			recurrenceFrequency: 'weekly',
+			recurrenceDays: ['3'],
+			recurrenceUntil: ''
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('requires at least one repeat day for recurring shifts', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			recurrenceFrequency: 'weekly',
+			recurrenceUntil: '2026-07-24',
+			recurrenceDays: []
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('parses selected repeat days for recurring shifts', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			recurrenceFrequency: 'weekly',
+			recurrenceUntil: '2026-07-24',
+			recurrenceDays: ['1', '2', '3']
+		});
+
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+
+		expect(result.output.recurrenceDays).toEqual([1, 2, 3]);
+	});
+
+	it('rejects repeat end dates more than one year after the shift date', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			recurrenceFrequency: 'weekly',
+			recurrenceDays: ['3'],
+			recurrenceUntil: '2027-06-25'
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it('ignores stale repeat end dates when recurrence is disabled', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			recurrenceFrequency: 'none',
+			recurrenceUntil: '2027-06-25',
+			recurrenceDays: ['1', '2']
+		});
+
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+
+		expect(result.output.recurrenceUntil).toBeNull();
+		expect(result.output.recurrenceDays).toBeNull();
+	});
+
+	it('parses edit shift submissions with the same shift fields', () => {
+		const result = v.safeParse(editShiftSchema, {
+			...validShift,
+			id: '42',
+			recurrenceFrequency: 'biweekly',
+			recurrenceUntil: '2026-08-24',
+			recurrenceDays: ['1', '3']
+		});
+
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+
+		expect(result.output).toMatchObject({
+			id: 42,
+			recurrenceFrequency: 'biweekly',
+			recurrenceDays: [1, 3]
+		});
 	});
 
 	it('shares clock validation and cross-midnight duration logic', () => {
