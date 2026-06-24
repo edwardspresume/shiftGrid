@@ -36,6 +36,13 @@
       "when": 1782356400000,
       "tag": "0004_add_shift_exceptions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782360000000,
+      "tag": "0005_constrain_shift_exception_action",
+      "breakpoints": true
     }
   ]
 }

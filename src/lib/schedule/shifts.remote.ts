@@ -238,7 +238,11 @@ export const getSchedule = query(scheduleWeekSchema, async (week) => {
 		})
 		.sort(
 			(first, second) =>
-				first.shiftDate.localeCompare(second.shiftDate) || first.time.localeCompare(second.time)
+				first.shiftDate.localeCompare(second.shiftDate) ||
+				first.startTime.localeCompare(second.startTime) ||
+				first.endTime.localeCompare(second.endTime) ||
+				first.location.localeCompare(second.location) ||
+				first.id.localeCompare(second.id)
 		);
 
 	const totalHours = scheduledShifts.reduce((total, shift) => total + shift.hoursValue, 0);
@@ -382,6 +386,25 @@ async function validateNoOverlap(
 	}
 }
 
+function recurrenceDaysMatch(first: number[] | null, second: number[] | null) {
+	const firstDays = [...(first ?? [])].sort((a, b) => a - b);
+	const secondDays = [...(second ?? [])].sort((a, b) => a - b);
+
+	return (
+		firstDays.length === secondDays.length &&
+		firstDays.every((day, index) => day === secondDays[index])
+	);
+}
+
+function hasRecurrencePatternChanged(existingShift: ShiftRule, updatedShift: ShiftRule) {
+	return (
+		existingShift.shiftDate !== updatedShift.shiftDate ||
+		existingShift.recurrenceFrequency !== updatedShift.recurrenceFrequency ||
+		existingShift.recurrenceUntil !== updatedShift.recurrenceUntil ||
+		!recurrenceDaysMatch(existingShift.recurrenceDays, updatedShift.recurrenceDays)
+	);
+}
+
 export const addShift = form(addShiftSchema, async (data, issue) => {
 	const shiftDate = parseCanonicalDate(data.shiftDate);
 	if (!shiftDate) {
@@ -420,7 +443,15 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 	}
 
 	const [existingShift] = await db
-		.select({ id: shifts.id })
+		.select({
+			id: shifts.id,
+			shiftDate: shifts.shiftDate,
+			startTime: shifts.startTime,
+			endTime: shifts.endTime,
+			recurrenceFrequency: shifts.recurrenceFrequency,
+			recurrenceUntil: shifts.recurrenceUntil,
+			recurrenceDays: shifts.recurrenceDays
+		})
 		.from(shifts)
 		.where(eq(shifts.id, data.id))
 		.limit(1);
@@ -431,6 +462,8 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 
 	await validateLocation(data.locationId, issue);
 	await validateNoOverlap(data, issue, data.id);
+
+	const shouldClearExceptions = hasRecurrencePatternChanged(existingShift, data);
 
 	await db
 		.update(shifts)
@@ -446,6 +479,10 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 			notes: data.notes
 		})
 		.where(eq(shifts.id, data.id));
+
+	if (shouldClearExceptions) {
+		await db.delete(shiftExceptions).where(eq(shiftExceptions.shiftId, data.id));
+	}
 
 	const weekStart = getWeekStart(shiftDate, DEFAULT_WEEK_STARTS_ON).toString();
 
@@ -481,7 +518,13 @@ export const deleteShift = form(deleteShiftSchema, async (data, issue) => {
 		invalid(issue.id('Choose an existing shift.'));
 	}
 
-	if (existingShift.recurrenceFrequency === 'none' || data.scope === 'series') {
+	if (existingShift.recurrenceFrequency === 'none') {
+		if (existingShift.shiftDate !== data.occurrenceDate) {
+			invalid(issue.occurrenceDate('Choose an existing shift occurrence.'));
+		}
+
+		await db.delete(shifts).where(eq(shifts.id, data.id));
+	} else if (data.scope === 'series') {
 		await db.delete(shifts).where(eq(shifts.id, data.id));
 	} else {
 		const matchingOccurrence = getOccurrenceDatesInRange(

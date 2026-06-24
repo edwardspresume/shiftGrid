@@ -1,5 +1,6 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
+	check,
 	date,
 	index,
 	integer,
@@ -71,6 +72,7 @@ export const shiftExceptions = pgTable(
 			.notNull()
 	},
 	(table) => [
+		check('shift_exceptions_action_check', sql`${table.action} in ('cancelled')`),
 		index('shift_exceptions_shift_id_idx').on(table.shiftId),
 		uniqueIndex('shift_exceptions_shift_id_occurrence_date_unique').on(
 			table.shiftId,
