@@ -19,8 +19,6 @@ export const locations = pgTable('locations', {
 	id: serial('id').primaryKey(),
 	name: text('name').notNull(),
 	color: text('color').notNull().default('#16a34a'),
-	address: text('address'),
-	notes: text('notes'),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at')
 		.defaultNow()

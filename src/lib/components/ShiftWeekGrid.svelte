@@ -11,7 +11,15 @@
 		shifts: ScheduledShift[];
 	};
 
-	let { weekStart, shifts }: { weekStart: CalendarDate; shifts: ScheduledShift[] } = $props();
+	let {
+		weekStart,
+		shifts,
+		onAddShift
+	}: {
+		weekStart: CalendarDate;
+		shifts: ScheduledShift[];
+		onAddShift: (shiftDate: string) => void;
+	} = $props();
 
 	const days: ShiftDay[] = $derived(
 		getWeekDays(weekStart).map((date) => ({
@@ -46,6 +54,7 @@
 						size="icon-sm"
 						class="shrink-0"
 						aria-label="Add shift for {day.label}"
+						onclick={() => onAddShift(day.id)}
 					>
 						<Plus class="size-4" />
 					</Button>

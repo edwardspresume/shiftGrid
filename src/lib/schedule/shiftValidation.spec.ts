@@ -3,7 +3,13 @@ import * as v from 'valibot';
 
 import { parseCanonicalDate } from './date';
 import { addShiftSchema } from './shiftValidation';
-import { getShiftHours, isClockInput } from './time';
+import {
+	formatClockTime,
+	getShiftHours,
+	getShiftMinuteRange,
+	isClockInput,
+	shiftMinuteRangesOverlap
+} from './time';
 
 const validShift = {
 	locationId: '1',
@@ -83,6 +89,36 @@ describe('addShiftSchema', () => {
 		expect(isClockInput('09:00')).toBe(true);
 		expect(isClockInput('9:00')).toBe(false);
 		expect(isClockInput('24:00')).toBe(false);
+		expect(formatClockTime('17:00')).toBe('5:00 PM');
 		expect(getShiftHours('22:00', '06:00', 30)).toBe(7.5);
+	});
+
+	it('detects overlapping shift time ranges without blocking adjacent shifts', () => {
+		const shiftDate = parseCanonicalDate('2026-06-24');
+		if (!shiftDate) throw new Error('Expected valid shift date');
+
+		const existingShift = getShiftMinuteRange(shiftDate, '09:00', '17:00');
+
+		expect(
+			shiftMinuteRangesOverlap(existingShift, getShiftMinuteRange(shiftDate, '13:00', '18:00'))
+		).toBe(true);
+		expect(
+			shiftMinuteRangesOverlap(existingShift, getShiftMinuteRange(shiftDate, '17:00', '21:00'))
+		).toBe(false);
+	});
+
+	it('detects overlaps when overnight shifts cover the following date', () => {
+		const shiftDate = parseCanonicalDate('2026-06-24');
+		const nextDate = parseCanonicalDate('2026-06-25');
+		if (!shiftDate || !nextDate) throw new Error('Expected valid shift dates');
+
+		const overnightShift = getShiftMinuteRange(shiftDate, '22:00', '06:00');
+
+		expect(
+			shiftMinuteRangesOverlap(overnightShift, getShiftMinuteRange(nextDate, '01:00', '03:00'))
+		).toBe(true);
+		expect(
+			shiftMinuteRangesOverlap(overnightShift, getShiftMinuteRange(nextDate, '06:00', '10:00'))
+		).toBe(false);
 	});
 });

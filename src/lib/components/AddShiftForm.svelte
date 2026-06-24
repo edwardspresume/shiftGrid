@@ -12,13 +12,16 @@
 		recurrenceFrequencyLabels,
 		recurrenceFrequencyValues
 	} from '$lib/schedule/constants';
+	import { parseCanonicalDate } from '$lib/schedule/date';
 	import { addShift, getSchedule, type LocationOption } from '$lib/schedule/shifts.remote';
 	import {
 		DEFAULT_END_TIME,
 		DEFAULT_START_TIME,
+		formatClockTime,
 		formatCompactHours,
 		getShiftHours
 	} from '$lib/schedule/time';
+	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
@@ -26,11 +29,13 @@
 	let {
 		locations,
 		initialDate,
+		visibleWeekStart,
 		currentWeekQuery,
 		onCancel
 	}: {
 		locations: LocationOption[];
 		initialDate: string;
+		visibleWeekStart: string;
 		currentWeekQuery: string | null;
 		onCancel: () => void;
 	} = $props();
@@ -78,6 +83,9 @@
 
 	const totalHours = $derived(getShiftHours(startTime, endTime, Number(breakMinutes)));
 	const formattedHours = $derived(formatCompactHours(totalHours));
+	const formattedTimeRange = $derived(
+		`${formatClockTime(startTime)} - ${formatClockTime(endTime)}`
+	);
 
 	function resetForm(element: HTMLFormElement) {
 		element.reset();
@@ -87,14 +95,20 @@
 
 <form
 	{...addShift.enhance(async (form) => {
+		const submittedShiftDate = String(form.fields.shiftDate.value() || initialDate);
 		const submitted = await form.submit().updates(getSchedule(currentWeekQuery));
-		if (!submitted || !addShift.result?.success) return;
+		if (!submitted) return;
+
+		const submittedCalendarDate = parseCanonicalDate(submittedShiftDate);
+		const submittedWeekStart = submittedCalendarDate
+			? getWeekStart(submittedCalendarDate, DEFAULT_WEEK_STARTS_ON).toString()
+			: initialDate;
 
 		resetForm(form.element);
 		onCancel();
 
-		if (addShift.result.weekStart !== initialDate) {
-			await goto(resolve(`/?week=${addShift.result.weekStart}`), {
+		if (submittedWeekStart !== visibleWeekStart) {
+			await goto(resolve(`/?week=${submittedWeekStart}`), {
 				keepFocus: true,
 				noScroll: true
 			});
@@ -129,7 +143,7 @@
 							<option value="">No locations available</option>
 						{:else}
 							{#each locations as location (location.id)}
-								<option value={location.id}>{location.name}</option>
+								<option value={location.id.toString()}>{location.name}</option>
 							{/each}
 						{/if}
 					</select>
@@ -149,6 +163,7 @@
 						{...addShift.fields.shiftDate.as('date', initialDate)}
 						class={`${fieldClass} pl-9`}
 						required
+						readonly
 					/>
 				</span>
 				{#each addShift.fields.shiftDate.issues() ?? [] as issue (issue.message)}
@@ -251,14 +266,9 @@
 					style:border-left-color={selectedLocation?.color}
 				>
 					<p class="text-sm font-bold">{selectedLocation?.name ?? 'Location'}</p>
-					{#if selectedLocation?.address}
-						<p class="mt-1 truncate text-xs font-medium text-muted-foreground">
-							{selectedLocation.address}
-						</p>
-					{/if}
 					<p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
 						<Clock3 class="size-3.5" />
-						{startTime} - {endTime}
+						{formattedTimeRange}
 					</p>
 					<p class="mt-1 text-xs font-medium text-muted-foreground">{formattedHours} total</p>
 				</div>

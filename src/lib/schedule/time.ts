@@ -1,7 +1,9 @@
 import { parseTime, type Time } from '@internationalized/date';
+import type { CalendarDate } from '@internationalized/date';
 
 export const DEFAULT_START_TIME = '09:00';
 export const DEFAULT_END_TIME = '17:00';
+const MINUTES_PER_DAY = 24 * 60;
 
 const clockInputPattern = /^\d{2}:\d{2}$/;
 
@@ -31,6 +33,29 @@ export function isClockInput(value: string) {
 export function getClockMinutes(value: string) {
 	const time = parseTime(value);
 	return time.hour * 60 + time.minute + time.second / 60 + time.millisecond / 60000;
+}
+
+function getDateStartMinutes(date: CalendarDate) {
+	return Date.UTC(date.year, date.month - 1, date.day) / 60000;
+}
+
+export function getShiftMinuteRange(shiftDate: CalendarDate, startTime: string, endTime: string) {
+	const dateStartMinutes = getDateStartMinutes(shiftDate);
+	const start = dateStartMinutes + getClockMinutes(startTime);
+	let end = dateStartMinutes + getClockMinutes(endTime);
+
+	if (end <= start) {
+		end += MINUTES_PER_DAY;
+	}
+
+	return { start, end };
+}
+
+export function shiftMinuteRangesOverlap(
+	first: ReturnType<typeof getShiftMinuteRange>,
+	second: ReturnType<typeof getShiftMinuteRange>
+) {
+	return first.start < second.end && second.start < first.end;
 }
 
 export function getShiftHours(startTime: string, endTime: string, breakMinutes: number) {
