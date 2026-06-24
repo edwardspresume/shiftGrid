@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		DialogDescription,
@@ -22,8 +24,6 @@
 		getShiftHours
 	} from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
 
 	let {
@@ -115,15 +115,13 @@
 		}
 	})}
 >
-	<header class="border-b px-4 py-4 pr-12">
-		<DialogHeader>
-			<DialogTitle>Add shift</DialogTitle>
-			<DialogDescription class="sr-only">
-				Create a scheduled shift with location, date, time, break, recurrence, and notes.
-			</DialogDescription>
-			<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
-		</DialogHeader>
-	</header>
+	<DialogHeader class="border-b p-4">
+		<DialogTitle>Add shift</DialogTitle>
+		<DialogDescription class="sr-only">
+			Create a scheduled shift with location, date, time, break, recurrence, and notes.
+		</DialogDescription>
+		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
+	</DialogHeader>
 
 	<div class="grid max-h-[calc(100dvh-12rem)] gap-5 overflow-y-auto p-4 lg:grid-cols-[1fr_18rem]">
 		<div class="grid gap-4 md:grid-cols-2">
