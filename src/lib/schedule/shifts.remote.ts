@@ -4,9 +4,10 @@ import {
 	recurrenceFrequencyDisplayLabels,
 	type RecurrenceFrequency
 } from '$lib/schedule/constants';
+import { parseCanonicalDate } from '$lib/schedule/date';
 import { addShiftSchema, scheduleWeekSchema } from '$lib/schedule/shiftValidation';
+import { formatClockTime, formatHours, getShiftHours } from '$lib/schedule/time';
 import { DEFAULT_WEEK_STARTS_ON, getCurrentWeekStart, getWeekStart } from '$lib/schedule/week';
-import { parseDate } from '@internationalized/date';
 import { invalid } from '@sveltejs/kit';
 import { form, query } from '$app/server';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
@@ -16,42 +17,10 @@ function resolveWeekStart(week: string | null | undefined) {
 		return getCurrentWeekStart(DEFAULT_WEEK_STARTS_ON);
 	}
 
-	try {
-		return getWeekStart(parseDate(week), DEFAULT_WEEK_STARTS_ON);
-	} catch {
-		return getCurrentWeekStart(DEFAULT_WEEK_STARTS_ON);
-	}
-}
-
-function formatClockTime(time: string) {
-	const [hourValue = '0', minuteValue = '0'] = time.split(':');
-	const hour = Number.parseInt(hourValue, 10);
-	const minute = Number.parseInt(minuteValue, 10);
-	const period = hour >= 12 ? 'PM' : 'AM';
-	const displayHour = hour % 12 || 12;
-
-	return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
-}
-
-function getMinutes(time: string) {
-	const [hourValue = '0', minuteValue = '0'] = time.split(':');
-	return Number.parseInt(hourValue, 10) * 60 + Number.parseInt(minuteValue, 10);
-}
-
-function getShiftHours(startTime: string, endTime: string, breakMinutes: number) {
-	const startMinutes = getMinutes(startTime);
-	let endMinutes = getMinutes(endTime);
-
-	if (endMinutes <= startMinutes) {
-		endMinutes += 24 * 60;
-	}
-
-	return Math.max((endMinutes - startMinutes - breakMinutes) / 60, 0);
-}
-
-function formatHours(hours: number) {
-	const formatted = Number.isInteger(hours) ? hours.toString() : hours.toFixed(1);
-	return `${formatted} ${hours === 1 ? 'hour' : 'hours'}`;
+	const date = parseCanonicalDate(week);
+	return date
+		? getWeekStart(date, DEFAULT_WEEK_STARTS_ON)
+		: getCurrentWeekStart(DEFAULT_WEEK_STARTS_ON);
 }
 
 function formatRecurrence(frequency: RecurrenceFrequency) {
@@ -135,6 +104,11 @@ export const addShift = form(addShiftSchema, async (data, issue) => {
 		invalid(issue.locationId('Choose an existing location.'));
 	}
 
+	const shiftDate = parseCanonicalDate(data.shiftDate);
+	if (!shiftDate) {
+		invalid(issue.shiftDate('Use a valid shift date.'));
+	}
+
 	await db.insert(shifts).values({
 		locationId: data.locationId,
 		shiftDate: data.shiftDate,
@@ -146,7 +120,7 @@ export const addShift = form(addShiftSchema, async (data, issue) => {
 		notes: data.notes
 	});
 
-	const weekStart = getWeekStart(parseDate(data.shiftDate), DEFAULT_WEEK_STARTS_ON).toString();
+	const weekStart = getWeekStart(shiftDate, DEFAULT_WEEK_STARTS_ON).toString();
 
 	return {
 		success: true,

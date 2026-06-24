@@ -13,6 +13,12 @@
 		recurrenceFrequencyValues
 	} from '$lib/schedule/constants';
 	import { addShift, getSchedule, type LocationOption } from '$lib/schedule/shifts.remote';
+	import {
+		DEFAULT_END_TIME,
+		DEFAULT_START_TIME,
+		formatCompactHours,
+		getShiftHours
+	} from '$lib/schedule/time';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
@@ -41,8 +47,8 @@
 	const activeLocationId = $derived(
 		String(addShift.fields.locationId.value() || defaultLocationId)
 	);
-	const startTime = $derived(String(addShift.fields.startTime.value() || '09:00'));
-	const endTime = $derived(String(addShift.fields.endTime.value() || '17:00'));
+	const startTime = $derived(String(addShift.fields.startTime.value() || DEFAULT_START_TIME));
+	const endTime = $derived(String(addShift.fields.endTime.value() || DEFAULT_END_TIME));
 	const breakMinutes = $derived(
 		String(addShift.fields.breakMinutes.value() || breakMinuteOptions[0])
 	);
@@ -55,8 +61,8 @@
 	const defaultFormValues = $derived({
 		locationId: defaultLocationId,
 		shiftDate: initialDate,
-		startTime: '09:00',
-		endTime: '17:00',
+		startTime: DEFAULT_START_TIME,
+		endTime: DEFAULT_END_TIME,
 		breakMinutes: breakMinuteOptions[0],
 		recurrenceFrequency: recurrenceFrequencyValues[0],
 		recurrenceUntil: '',
@@ -70,25 +76,8 @@
 		addShift.fields.set(defaultFormValues);
 	});
 
-	function getShiftMinutes() {
-		const [startHour, startMinute] = startTime.split(':').map(Number);
-		const [endHour, endMinute] = endTime.split(':').map(Number);
-		const parsedBreak = Number.parseInt(breakMinutes, 10) || 0;
-
-		let startTotal = startHour * 60 + startMinute;
-		let endTotal = endHour * 60 + endMinute;
-
-		if (endTotal <= startTotal) {
-			endTotal += 24 * 60;
-		}
-
-		return Math.max(endTotal - startTotal - parsedBreak, 0);
-	}
-
-	const totalHours = $derived(getShiftMinutes() / 60);
-	const formattedHours = $derived(
-		`${Number.isInteger(totalHours) ? totalHours : totalHours.toFixed(1)}h`
-	);
+	const totalHours = $derived(getShiftHours(startTime, endTime, Number(breakMinutes)));
+	const formattedHours = $derived(formatCompactHours(totalHours));
 
 	function resetForm(element: HTMLFormElement) {
 		element.reset();
@@ -194,7 +183,7 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						{...addShift.fields.startTime.as('time', '09:00')}
+						{...addShift.fields.startTime.as('time', DEFAULT_START_TIME)}
 						class={`${fieldClass} pl-9`}
 						required
 					/>
@@ -211,7 +200,7 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						{...addShift.fields.endTime.as('time', '17:00')}
+						{...addShift.fields.endTime.as('time', DEFAULT_END_TIME)}
 						class={`${fieldClass} pl-9`}
 						required
 					/>

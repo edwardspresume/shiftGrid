@@ -1,27 +1,8 @@
-import { parseDate } from '@internationalized/date';
 import * as v from 'valibot';
 
 import { breakMinuteOptions, recurrenceFrequencyValues } from '$lib/schedule/constants';
-
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-const timePattern = /^\d{2}:\d{2}$/;
-
-function isValidDate(value: string) {
-	if (!datePattern.test(value)) return false;
-
-	try {
-		return parseDate(value).toString() === value;
-	} catch {
-		return false;
-	}
-}
-
-function isValidTime(value: string) {
-	if (!timePattern.test(value)) return false;
-
-	const [hour = 0, minute = 0] = value.split(':').map(Number);
-	return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
-}
+import { isCanonicalDate } from '$lib/schedule/date';
+import { isClockInput } from '$lib/schedule/time';
 
 export const scheduleWeekSchema = v.nullish(v.string());
 
@@ -38,19 +19,19 @@ export const addShiftSchema = v.pipe(
 			v.string('Choose a shift date.'),
 			v.trim(),
 			v.minLength(1, 'Choose a shift date.'),
-			v.check(isValidDate, 'Use a valid shift date.')
+			v.check(isCanonicalDate, 'Use a valid shift date.')
 		),
 		startTime: v.pipe(
 			v.string('Choose a start time.'),
 			v.trim(),
 			v.minLength(1, 'Choose a start time.'),
-			v.check(isValidTime, 'Use a valid start time.')
+			v.check(isClockInput, 'Use a valid start time.')
 		),
 		endTime: v.pipe(
 			v.string('Choose an end time.'),
 			v.trim(),
 			v.minLength(1, 'Choose an end time.'),
-			v.check(isValidTime, 'Use a valid end time.')
+			v.check(isClockInput, 'Use a valid end time.')
 		),
 		breakMinutes: v.pipe(
 			v.picklist(breakMinuteOptions, 'Choose a valid break.'),
@@ -61,7 +42,7 @@ export const addShiftSchema = v.pipe(
 			v.fallback(v.string(), ''),
 			v.trim(),
 			v.transform((value): string | null => (value === '' ? null : value)),
-			v.check((value) => value === null || isValidDate(value), 'Use a valid repeat end date.')
+			v.check((value) => value === null || isCanonicalDate(value), 'Use a valid repeat end date.')
 		),
 		notes: v.pipe(
 			v.fallback(v.string(), ''),

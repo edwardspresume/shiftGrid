@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
 
+import { parseCanonicalDate } from './date';
 import { addShiftSchema } from './shiftValidation';
+import { getShiftHours, isClockInput } from './time';
 
 const validShift = {
 	locationId: '1',
@@ -39,6 +41,15 @@ describe('addShiftSchema', () => {
 		expect(result.success).toBe(false);
 	});
 
+	it('rejects non-minute-precision form time values', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			startTime: '09:00:00'
+		});
+
+		expect(result.success).toBe(false);
+	});
+
 	it('rejects non-canonical date values', () => {
 		const result = v.safeParse(addShiftSchema, {
 			...validShift,
@@ -46,6 +57,7 @@ describe('addShiftSchema', () => {
 		});
 
 		expect(result.success).toBe(false);
+		expect(parseCanonicalDate('0000-01-01')).toBeNull();
 	});
 
 	it('rejects invalid break values instead of silently defaulting them', () => {
@@ -65,5 +77,12 @@ describe('addShiftSchema', () => {
 		});
 
 		expect(result.success).toBe(false);
+	});
+
+	it('shares clock validation and cross-midnight duration logic', () => {
+		expect(isClockInput('09:00')).toBe(true);
+		expect(isClockInput('9:00')).toBe(false);
+		expect(isClockInput('24:00')).toBe(false);
+		expect(getShiftHours('22:00', '06:00', 30)).toBe(7.5);
 	});
 });
