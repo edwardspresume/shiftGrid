@@ -1,23 +1,29 @@
 import { db } from '$lib/server/db';
-import { locations, shifts } from '$lib/server/db/schema';
+import { locations, shiftExceptions, shifts } from '$lib/server/db/schema';
 import {
 	recurrenceFrequencyDisplayLabels,
 	recurrenceDayLabels,
 	type RecurrenceFrequency
 } from '$lib/schedule/constants';
 import { parseCanonicalDate } from '$lib/schedule/date';
-import { addShiftSchema, editShiftSchema, scheduleWeekSchema } from '$lib/schedule/shiftValidation';
+import {
+	addShiftSchema,
+	deleteShiftSchema,
+	editShiftSchema,
+	scheduleWeekSchema
+} from '$lib/schedule/shiftValidation';
 import {
 	formatClockTime,
 	formatHours,
 	getShiftHours,
 	getShiftMinuteRange,
+	normalizeClockInput,
 	shiftMinuteRangesOverlap
 } from '$lib/schedule/time';
 import { DEFAULT_WEEK_STARTS_ON, getCurrentWeekStart, getWeekStart } from '$lib/schedule/week';
 import { invalid } from '@sveltejs/kit';
 import { form, query, requested } from '$app/server';
-import { and, asc, eq, gte, lte, ne, or } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, ne, or } from 'drizzle-orm';
 import type { CalendarDate } from '@internationalized/date';
 
 type ShiftRule = {
@@ -174,30 +180,61 @@ export const getSchedule = query(scheduleWeekSchema, async (week) => {
 		.where(getShiftDateWindowWhere(weekStart.toString(), weekEnd.toString()))
 		.orderBy(asc(shifts.shiftDate), asc(shifts.startTime));
 
+	const shiftIds = shiftRows.map((shift) => shift.id);
+	const exceptionRows =
+		shiftIds.length > 0
+			? await db
+					.select({
+						shiftId: shiftExceptions.shiftId,
+						occurrenceDate: shiftExceptions.occurrenceDate
+					})
+					.from(shiftExceptions)
+					.where(
+						and(
+							inArray(shiftExceptions.shiftId, shiftIds),
+							eq(shiftExceptions.action, 'cancelled'),
+							gte(shiftExceptions.occurrenceDate, weekStart.toString()),
+							lte(shiftExceptions.occurrenceDate, weekEnd.toString())
+						)
+					)
+			: [];
+	const cancelledOccurrences = new Map<number, Set<string>>();
+
+	for (const exception of exceptionRows) {
+		const dates = cancelledOccurrences.get(exception.shiftId) ?? new Set<string>();
+		dates.add(exception.occurrenceDate);
+		cancelledOccurrences.set(exception.shiftId, dates);
+	}
+
 	const scheduledShifts = shiftRows
 		.flatMap((shift) => {
-			const hours = getShiftHours(shift.startTime, shift.endTime, shift.breakMinutes);
+			const startTime = normalizeClockInput(shift.startTime);
+			const endTime = normalizeClockInput(shift.endTime);
+			const hours = getShiftHours(startTime, endTime, shift.breakMinutes);
+			const cancelledDates = cancelledOccurrences.get(shift.id) ?? new Set<string>();
 
-			return getOccurrenceDatesInRange(shift, weekStart, weekEnd).map((occurrenceDate) => ({
-				id: `${shift.id}:${occurrenceDate.toString()}`,
-				ruleId: shift.id,
-				shiftDate: occurrenceDate.toString(),
-				baseShiftDate: shift.shiftDate,
-				locationId: shift.locationId,
-				location: shift.locationName,
-				locationColor: shift.locationColor,
-				startTime: shift.startTime,
-				endTime: shift.endTime,
-				breakMinutes: shift.breakMinutes,
-				recurrenceFrequency: shift.recurrenceFrequency,
-				recurrenceUntil: shift.recurrenceUntil,
-				recurrenceDays: shift.recurrenceDays,
-				notes: shift.notes,
-				time: `${formatClockTime(shift.startTime)} - ${formatClockTime(shift.endTime)}`,
-				hours: formatHours(hours),
-				hoursValue: hours,
-				frequency: formatRecurrence(shift.recurrenceFrequency, shift.recurrenceDays)
-			}));
+			return getOccurrenceDatesInRange(shift, weekStart, weekEnd)
+				.filter((occurrenceDate) => !cancelledDates.has(occurrenceDate.toString()))
+				.map((occurrenceDate) => ({
+					id: `${shift.id}:${occurrenceDate.toString()}`,
+					ruleId: shift.id,
+					shiftDate: occurrenceDate.toString(),
+					baseShiftDate: shift.shiftDate,
+					locationId: shift.locationId,
+					location: shift.locationName,
+					locationColor: shift.locationColor,
+					startTime,
+					endTime,
+					breakMinutes: shift.breakMinutes,
+					recurrenceFrequency: shift.recurrenceFrequency,
+					recurrenceUntil: shift.recurrenceUntil,
+					recurrenceDays: shift.recurrenceDays,
+					notes: shift.notes,
+					time: `${formatClockTime(startTime)} - ${formatClockTime(endTime)}`,
+					hours: formatHours(hours),
+					hoursValue: hours,
+					frequency: formatRecurrence(shift.recurrenceFrequency, shift.recurrenceDays)
+				}));
 		})
 		.sort(
 			(first, second) =>
@@ -261,6 +298,7 @@ async function validateNoOverlap(
 	const overlapWindowEnd = recurrenceUntil.add({ days: 1 }).toString();
 	const existingShifts = await db
 		.select({
+			id: shifts.id,
 			shiftDate: shifts.shiftDate,
 			startTime: shifts.startTime,
 			endTime: shifts.endTime,
@@ -277,6 +315,31 @@ async function validateNoOverlap(
 					)
 				: getShiftDateWindowWhere(overlapWindowStart, overlapWindowEnd)
 		);
+	const existingShiftIds = existingShifts.map((shift) => shift.id);
+	const exceptionRows =
+		existingShiftIds.length > 0
+			? await db
+					.select({
+						shiftId: shiftExceptions.shiftId,
+						occurrenceDate: shiftExceptions.occurrenceDate
+					})
+					.from(shiftExceptions)
+					.where(
+						and(
+							inArray(shiftExceptions.shiftId, existingShiftIds),
+							eq(shiftExceptions.action, 'cancelled'),
+							gte(shiftExceptions.occurrenceDate, overlapWindowStart),
+							lte(shiftExceptions.occurrenceDate, overlapWindowEnd)
+						)
+					)
+			: [];
+	const cancelledOccurrences = new Map<number, Set<string>>();
+
+	for (const exception of exceptionRows) {
+		const dates = cancelledOccurrences.get(exception.shiftId) ?? new Set<string>();
+		dates.add(exception.occurrenceDate);
+		cancelledOccurrences.set(exception.shiftId, dates);
+	}
 
 	const newOccurrences = getOccurrenceDatesInRange(
 		data,
@@ -290,7 +353,12 @@ async function validateNoOverlap(
 				existingShift,
 				shiftDate.subtract({ days: 1 }),
 				recurrenceUntil.add({ days: 1 })
-			).map((occurrenceDate) => ({ ...existingShift, occurrenceDate }))
+			)
+				.filter(
+					(occurrenceDate) =>
+						!cancelledOccurrences.get(existingShift.id)?.has(occurrenceDate.toString())
+				)
+				.map((occurrenceDate) => ({ ...existingShift, occurrenceDate }))
 		)
 		.find((existingShift) =>
 			newOccurrences.some((newOccurrenceDate) =>
@@ -386,5 +454,59 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 	return {
 		success: true,
 		weekStart
+	};
+});
+
+export const deleteShift = form(deleteShiftSchema, async (data, issue) => {
+	const occurrenceDate = parseCanonicalDate(data.occurrenceDate);
+	if (!occurrenceDate) {
+		invalid(issue.occurrenceDate('Use a valid shift date.'));
+	}
+
+	const [existingShift] = await db
+		.select({
+			id: shifts.id,
+			shiftDate: shifts.shiftDate,
+			startTime: shifts.startTime,
+			endTime: shifts.endTime,
+			recurrenceFrequency: shifts.recurrenceFrequency,
+			recurrenceUntil: shifts.recurrenceUntil,
+			recurrenceDays: shifts.recurrenceDays
+		})
+		.from(shifts)
+		.where(eq(shifts.id, data.id))
+		.limit(1);
+
+	if (!existingShift) {
+		invalid(issue.id('Choose an existing shift.'));
+	}
+
+	if (existingShift.recurrenceFrequency === 'none' || data.scope === 'series') {
+		await db.delete(shifts).where(eq(shifts.id, data.id));
+	} else {
+		const matchingOccurrence = getOccurrenceDatesInRange(
+			existingShift,
+			occurrenceDate,
+			occurrenceDate
+		).some((date) => date.compare(occurrenceDate) === 0);
+
+		if (!matchingOccurrence) {
+			invalid(issue.occurrenceDate('Choose an existing shift occurrence.'));
+		}
+
+		await db
+			.insert(shiftExceptions)
+			.values({
+				shiftId: data.id,
+				occurrenceDate: data.occurrenceDate,
+				action: 'cancelled'
+			})
+			.onConflictDoNothing();
+	}
+
+	await requested(getSchedule, 1).refreshAll();
+
+	return {
+		success: true
 	};
 });

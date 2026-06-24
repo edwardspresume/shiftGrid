@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
 
 import { parseCanonicalDate } from './date';
-import { addShiftSchema, editShiftSchema } from './shiftValidation';
+import { addShiftSchema, deleteShiftSchema, editShiftSchema } from './shiftValidation';
 import {
 	formatClockTime,
 	getShiftHours,
 	getShiftMinuteRange,
 	isClockInput,
+	normalizeClockInput,
 	shiftMinuteRangesOverlap
 } from './time';
 
@@ -167,10 +168,29 @@ describe('addShiftSchema', () => {
 		});
 	});
 
+	it('parses delete shift submissions', () => {
+		const result = v.safeParse(deleteShiftSchema, {
+			id: '42',
+			occurrenceDate: '2026-06-24',
+			scope: 'single'
+		});
+
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+
+		expect(result.output).toEqual({
+			id: 42,
+			occurrenceDate: '2026-06-24',
+			scope: 'single'
+		});
+	});
+
 	it('shares clock validation and cross-midnight duration logic', () => {
 		expect(isClockInput('09:00')).toBe(true);
 		expect(isClockInput('9:00')).toBe(false);
 		expect(isClockInput('24:00')).toBe(false);
+		expect(isClockInput('09:00:00')).toBe(false);
+		expect(normalizeClockInput('09:00:00')).toBe('09:00');
 		expect(formatClockTime('17:00')).toBe('5:00 PM');
 		expect(getShiftHours('22:00', '06:00', 30)).toBe(7.5);
 	});

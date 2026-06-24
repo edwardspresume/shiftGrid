@@ -26,6 +26,10 @@ export function parseClockInput(value: string): Time | null {
 	}
 }
 
+export function normalizeClockInput(value: string) {
+	return formatClockInput(parseTime(value));
+}
+
 export function isClockInput(value: string) {
 	return parseClockInput(value) !== null;
 }

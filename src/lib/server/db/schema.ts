@@ -8,7 +8,8 @@ import {
 	serial,
 	text,
 	time,
-	timestamp
+	timestamp,
+	uniqueIndex
 } from 'drizzle-orm/pg-core';
 
 import { recurrenceFrequencyValues } from '../../schedule/constants';
@@ -54,14 +55,46 @@ export const shifts = pgTable(
 	]
 );
 
+export const shiftExceptions = pgTable(
+	'shift_exceptions',
+	{
+		id: serial('id').primaryKey(),
+		shiftId: integer('shift_id')
+			.notNull()
+			.references(() => shifts.id, { onDelete: 'cascade' }),
+		occurrenceDate: date('occurrence_date').notNull(),
+		action: text('action').notNull().default('cancelled'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at')
+			.defaultNow()
+			.$onUpdate(() => new Date())
+			.notNull()
+	},
+	(table) => [
+		index('shift_exceptions_shift_id_idx').on(table.shiftId),
+		uniqueIndex('shift_exceptions_shift_id_occurrence_date_unique').on(
+			table.shiftId,
+			table.occurrenceDate
+		)
+	]
+);
+
 export const locationsRelations = relations(locations, ({ many }) => ({
 	shifts: many(shifts)
 }));
 
-export const shiftsRelations = relations(shifts, ({ one }) => ({
+export const shiftsRelations = relations(shifts, ({ many, one }) => ({
 	location: one(locations, {
 		fields: [shifts.locationId],
 		references: [locations.id]
+	}),
+	exceptions: many(shiftExceptions)
+}));
+
+export const shiftExceptionsRelations = relations(shiftExceptions, ({ one }) => ({
+	shift: one(shifts, {
+		fields: [shiftExceptions.shiftId],
+		references: [shifts.id]
 	})
 }));
 

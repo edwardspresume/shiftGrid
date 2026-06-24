@@ -16,7 +16,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Per-day add-shift buttons that open a modal form with the date fixed to that day.
 - Shift form fields for location, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
 - Shift cards show location, recurrence label, time range, and total hours.
-- Shift cards include a three-dot actions menu with edit available. Delete is not implemented yet.
+- Shift cards include a three-dot actions menu with edit and delete actions.
 - Overnight shifts are supported by treating an end time earlier than or equal to the start time as next-day coverage.
 - Light and dark theme support through the existing theme toggle.
 
@@ -29,13 +29,15 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Weekly and biweekly shifts require at least one selected repeat weekday.
 - Repeat-until cannot be before the shift date and is capped at `RECURRENCE_LIMIT_YEARS`.
 - Recurring shifts are stored as one database row representing the rule, then expanded into visible occurrences for the requested week.
-- Editing a recurring shift currently edits the whole stored rule. Single-occurrence edits require recurrence exceptions and are not implemented yet.
+- Editing a recurring shift currently edits the whole stored rule.
+- Deleting a single recurring shift creates a cancellation exception for that occurrence date. Deleting a series deletes the stored rule and cascades its exceptions.
 - Bulk recurring creation is all-or-nothing: any overlap blocks the new recurring rule rather than silently skipping dates.
 
 ## Data Model
 
 - `locations` stores `id`, `name`, `color`, and timestamps.
 - `shifts` stores the scheduling rule: location, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, and timestamps.
+- `shift_exceptions` stores per-occurrence changes for recurring series. It currently supports cancelled occurrences.
 - Better Auth demo tables still exist separately under the auth schema.
 
 ## Remote Data Flow
@@ -45,6 +47,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - `getLocations()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static location data.
 - `addShift` validates input, checks location existence, checks overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
 - `editShift` validates the same scheduling rules, excludes the edited rule during overlap checks, updates the stored rule, and accepts one requested `getSchedule` refresh.
+- `deleteShift` deletes one-time shifts directly, deletes recurring series directly, or creates a cancelled occurrence exception for a single recurring shift.
 - Shift forms submit with `form.submit().updates(getSchedule(currentWeekQuery))`, keeping refresh scoped to the visible schedule query and avoiding a full app invalidation.
 
 ## Important Source Areas
@@ -62,8 +65,8 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 ## Known Product Gaps
 
-- There is no shift delete flow yet, including delete-this-occurrence, delete-this-and-future, or delete-entire-series behavior.
-- Recurrence exceptions are not modeled yet. Add a `shift_exceptions`-style table before supporting single-occurrence deletes or edits.
+- There is no single-occurrence edit flow yet. Add modified exception rows before supporting "Edit this shift" for one item in a recurring series.
+- There is no "this and future shifts" edit/delete behavior yet. That requires splitting a recurring rule at the selected occurrence date.
 - Recurrence supports weekly and biweekly weekday patterns; monthly and end-after-N-occurrences rules do not exist yet.
 - Location management UI is not present in the main scheduling workflow.
 

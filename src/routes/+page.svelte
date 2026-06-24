@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AddShiftForm from '$lib/components/AddShiftForm.svelte';
+	import DeleteShiftDialog from '$lib/components/DeleteShiftDialog.svelte';
 	import EditShiftForm from '$lib/components/EditShiftForm.svelte';
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
@@ -24,8 +25,10 @@
 	const weekStart: CalendarDate = $derived(parseDate(schedule.weekStart));
 	let isAddShiftFormOpen = $state(false);
 	let isEditShiftFormOpen = $state(false);
+	let isDeleteShiftDialogOpen = $state(false);
 	let selectedShiftDate = $state('');
 	let selectedShift = $state<ScheduledShift | null>(null);
+	let selectedDeleteShift = $state<ScheduledShift | null>(null);
 
 	const summaryStats = $derived([
 		{
@@ -84,6 +87,15 @@
 
 	function closeEditShiftForm() {
 		isEditShiftFormOpen = false;
+	}
+
+	function openDeleteShiftDialog(shift: ScheduledShift) {
+		selectedDeleteShift = shift;
+		isDeleteShiftDialogOpen = true;
+	}
+
+	function closeDeleteShiftDialog() {
+		isDeleteShiftDialogOpen = false;
 	}
 </script>
 
@@ -153,10 +165,23 @@
 		</DialogContent>
 	</Dialog>
 
+	<Dialog bind:open={isDeleteShiftDialogOpen}>
+		<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-lg">
+			{#if selectedDeleteShift}
+				<DeleteShiftDialog
+					shift={selectedDeleteShift}
+					currentWeekQuery={page.url.searchParams.get('week')}
+					onCancel={closeDeleteShiftDialog}
+				/>
+			{/if}
+		</DialogContent>
+	</Dialog>
+
 	<ShiftWeekGrid
 		{weekStart}
 		shifts={schedule.shifts}
 		onAddShift={openAddShiftForm}
 		onEditShift={openEditShiftForm}
+		onDeleteShift={openDeleteShiftDialog}
 	/>
 </main>

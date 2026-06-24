@@ -10,6 +10,7 @@ import { isCanonicalDate, parseCanonicalDate } from '$lib/schedule/date';
 import { isClockInput } from '$lib/schedule/time';
 
 export const scheduleWeekSchema = v.nullish(v.string());
+export const deleteShiftScopeValues = ['single', 'series'] as const;
 
 const shiftFormFields = {
 	locationId: v.pipe(
@@ -160,3 +161,20 @@ export const editShiftSchema = v.pipe(
 		recurrenceDays: data.recurrenceFrequency === 'none' ? null : data.recurrenceDays
 	}))
 );
+
+export const deleteShiftSchema = v.object({
+	id: v.pipe(
+		v.string('Choose a shift.'),
+		v.trim(),
+		v.transform(Number),
+		v.integer('Choose a shift.'),
+		v.minValue(1, 'Choose a shift.')
+	),
+	occurrenceDate: v.pipe(
+		v.string('Choose a shift date.'),
+		v.trim(),
+		v.minLength(1, 'Choose a shift date.'),
+		v.check(isCanonicalDate, 'Use a valid shift date.')
+	),
+	scope: v.picklist(deleteShiftScopeValues, 'Choose what to delete.')
+});

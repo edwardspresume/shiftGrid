@@ -16,12 +16,14 @@
 		weekStart,
 		shifts,
 		onAddShift,
-		onEditShift
+		onEditShift,
+		onDeleteShift
 	}: {
 		weekStart: CalendarDate;
 		shifts: ScheduledShift[];
 		onAddShift: (shiftDate: string) => void;
 		onEditShift: (shift: ScheduledShift) => void;
+		onDeleteShift: (shift: ScheduledShift) => void;
 	} = $props();
 
 	const days: ShiftDay[] = $derived(
@@ -38,6 +40,8 @@
 	const formatHours = (hours: number) => `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
 
 	const formatShiftCount = (count: number) => `${count} ${count === 1 ? 'shift' : 'shifts'}`;
+
+	const isRecurring = (shift: ScheduledShift) => shift.recurrenceFrequency !== 'none';
 </script>
 
 <section aria-label="Weekly shift grid" class="grid grid-cols-7 gap-3">
@@ -107,10 +111,10 @@
 									<DropdownMenu.Content align="end">
 										<DropdownMenu.Item onSelect={() => onEditShift(shift)}>
 											<Pencil class="size-4" />
-											Edit
+											{isRecurring(shift) ? 'Edit series' : 'Edit'}
 										</DropdownMenu.Item>
 										<DropdownMenu.Separator />
-										<DropdownMenu.Item disabled variant="destructive">
+										<DropdownMenu.Item onSelect={() => onDeleteShift(shift)} variant="destructive">
 											<Trash2 class="size-4" />
 											Delete
 										</DropdownMenu.Item>

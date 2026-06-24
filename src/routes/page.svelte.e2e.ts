@@ -51,6 +51,14 @@ async function openFirstDayAddShiftDialog(page: Page) {
 	return dialog;
 }
 
+async function openShiftActions(page: Page, shiftLabel: string, index = 0) {
+	await page
+		.getByRole('region', { name: 'Weekly shift grid' })
+		.getByRole('button', { name: new RegExp(`Shift actions for .* ${shiftLabel}`) })
+		.nth(index)
+		.click();
+}
+
 test('opens the add shift dialog from a day action', async ({ page }) => {
 	await page.goto('/');
 	const dialog = await openFirstDayAddShiftDialog(page);
@@ -88,13 +96,10 @@ test('adds a shift to the active week and blocks overlapping shift hours', async
 		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
 	).toBeVisible();
 
-	await page
-		.getByRole('region', { name: 'Weekly shift grid' })
-		.getByRole('button', { name: new RegExp(`Shift actions for .* ${startLabel} - ${endLabel}`) })
-		.click();
+	await openShiftActions(page, shiftLabel);
 	await page.getByRole('menuitem', { name: 'Edit' }).click();
 
-	const editDialog = page.getByRole('dialog', { name: 'Edit shift' });
+	let editDialog = page.getByRole('dialog', { name: 'Edit shift' });
 	const editedStartHour = endHour;
 	const editedEndHour = endHour + 1;
 	const editedStartTime = formatHourInput(editedStartHour);
@@ -103,6 +108,16 @@ test('adds a shift to the active week and blocks overlapping shift hours', async
 	const editedEndLabel = formatHourLabel(editedEndHour);
 	const editedShiftLabel = `${editedStartLabel} - ${editedEndLabel}`;
 
+	await expect(editDialog).toBeVisible();
+	await editDialog.getByRole('button', { name: 'Save changes' }).click();
+	await expect(editDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toBeVisible();
+
+	await openShiftActions(page, shiftLabel);
+	await page.getByRole('menuitem', { name: 'Edit' }).click();
+	editDialog = page.getByRole('dialog', { name: 'Edit shift' });
 	await expect(editDialog).toBeVisible();
 	await editDialog.getByLabel('Start time').fill(editedStartTime);
 	await editDialog.getByLabel('End time').fill(editedEndTime);
@@ -128,6 +143,39 @@ test('adds a shift to the active week and blocks overlapping shift hours', async
 			`This shift overlaps an existing shift from ${editedStartLabel} to ${editedEndLabel} on ${shiftDate}.`
 		)
 	).toBeVisible();
+});
+
+test('deletes a standalone shift', async ({ page }) => {
+	const shiftDate = getIsolatedFutureSunday();
+	const startHour = 6 + Math.floor(Math.random() * 2);
+	const endHour = startHour + 1;
+	const startTime = formatHourInput(startHour);
+	const endTime = formatHourInput(endHour);
+	const shiftLabel = `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`;
+
+	await page.goto(`/?week=${shiftDate}`);
+	const dialog = await openFirstDayAddShiftDialog(page);
+
+	await dialog.getByLabel('Start time').fill(startTime);
+	await dialog.getByLabel('End time').fill(endTime);
+	await dialog.getByRole('button', { name: 'Add shift' }).click();
+
+	await expect(dialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toBeVisible();
+
+	await openShiftActions(page, shiftLabel);
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+
+	const deleteDialog = page.getByRole('dialog', { name: 'Delete shift' });
+	await expect(deleteDialog).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Delete shift' }).click();
+
+	await expect(deleteDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(0);
 });
 
 test('shows recurring shifts through repeat until and blocks occurrence overlaps', async ({
@@ -166,6 +214,18 @@ test('shows recurring shifts through repeat until and blocks occurrence overlaps
 		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
 	).toHaveCount(2);
 
+	await openShiftActions(page, shiftLabel, 1);
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+
+	let deleteDialog = page.getByRole('dialog', { name: 'Delete shift' });
+	await expect(deleteDialog).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Delete this shift' }).click();
+
+	await expect(deleteDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(1);
+
 	dialog = await openFirstDayAddShiftDialog(page);
 	await expect(dialog.getByLabel('Date')).toHaveValue(nextWeekDate);
 	await dialog.getByLabel('Start time').fill(startTime);
@@ -177,4 +237,22 @@ test('shows recurring shifts through repeat until and blocks occurrence overlaps
 			`This shift overlaps an existing shift from ${startLabel} to ${endLabel} on ${nextWeekDate}.`
 		)
 	).toBeVisible();
+
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await openShiftActions(page, shiftLabel);
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+
+	deleteDialog = page.getByRole('dialog', { name: 'Delete shift' });
+	await expect(deleteDialog).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Delete series' }).click();
+
+	await expect(deleteDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(0);
+
+	await page.goto(`/?week=${shiftDate}`);
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(0);
 });
