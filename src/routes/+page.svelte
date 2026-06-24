@@ -5,66 +5,63 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
+	import { getSchedule } from '$lib/schedule/shifts.remote';
 	import {
 		DEFAULT_WEEK_STARTS_ON,
 		getCurrentWeekStart,
 		getWeekStart,
 		type WeekStartsOn
 	} from '$lib/schedule/week';
-	import type { DateValue } from '@internationalized/date';
+	import { parseDate, type CalendarDate, type DateValue } from '@internationalized/date';
 	import { BriefcaseBusiness, Clock3, MapPin, Plus } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 
 	const weekStartsOn: WeekStartsOn = DEFAULT_WEEK_STARTS_ON;
-	let weekStart = $state(getCurrentWeekStart(weekStartsOn));
+	const schedule = $derived(await getSchedule(page.url.searchParams.get('week')));
+	const weekStart: CalendarDate = $derived(parseDate(schedule.weekStart));
 	let isAddShiftFormOpen = $state(false);
 
-	const demoLocations = [
-		{
-			id: 1,
-			name: 'Northern Met',
-			color: '#16a34a',
-			address: '110 Northern Met Plaza'
-		},
-		{
-			id: 2,
-			name: 'Pine Valley',
-			color: '#2563eb',
-			address: '42 Pine Valley Road'
-		}
-	];
-
-	const summaryStats = [
+	const summaryStats = $derived([
 		{
 			label: 'Total hours',
-			value: '40h',
+			value: `${Number.isInteger(schedule.summary.totalHours) ? schedule.summary.totalHours : schedule.summary.totalHours.toFixed(1)}h`,
 			icon: Clock3
 		},
 		{
 			label: 'Scheduled shifts',
-			value: '6',
+			value: schedule.summary.scheduledShifts.toString(),
 			icon: BriefcaseBusiness
 		},
 		{
 			label: 'Locations',
-			value: '2',
+			value: schedule.summary.locations.toString(),
 			icon: MapPin
 		}
-	];
+	]);
+
+	function applyWeekStart(date: CalendarDate) {
+		goto(resolve(`/?week=${date.toString()}`), {
+			keepFocus: true,
+			noScroll: true
+		});
+	}
 
 	function goToPreviousWeek() {
-		weekStart = weekStart.subtract({ days: 7 });
+		applyWeekStart(weekStart.subtract({ days: 7 }));
 	}
 
 	function goToNextWeek() {
-		weekStart = weekStart.add({ days: 7 });
+		applyWeekStart(weekStart.add({ days: 7 }));
 	}
 
 	function goToThisWeek() {
-		weekStart = getCurrentWeekStart(weekStartsOn);
+		applyWeekStart(getCurrentWeekStart(weekStartsOn));
 	}
 
 	function applySelectedDate(date: DateValue) {
-		weekStart = getWeekStart(date, weekStartsOn);
+		applyWeekStart(getWeekStart(date, weekStartsOn));
 	}
 
 	function openAddShiftForm() {
@@ -124,12 +121,13 @@
 			class="max-h-[min(44rem,calc(100dvh-2rem))] max-w-5xl gap-0 overflow-hidden p-0 sm:max-w-5xl"
 		>
 			<AddShiftForm
-				locations={demoLocations}
+				locations={schedule.locations}
 				initialDate={weekStart.toString()}
+				currentWeekQuery={page.url.searchParams.get('week')}
 				onCancel={closeAddShiftForm}
 			/>
 		</DialogContent>
 	</Dialog>
 
-	<ShiftWeekGrid {weekStart} />
+	<ShiftWeekGrid {weekStart} shifts={schedule.shifts} />
 </main>

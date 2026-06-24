@@ -11,7 +11,9 @@ import {
 	timestamp
 } from 'drizzle-orm/pg-core';
 
-export const recurrenceFrequency = pgEnum('recurrence_frequency', ['none', 'weekly', 'biweekly']);
+import { recurrenceFrequencyValues } from '../../schedule/constants';
+
+export const recurrenceFrequency = pgEnum('recurrence_frequency', recurrenceFrequencyValues);
 
 export const locations = pgTable('locations', {
 	id: serial('id').primaryKey(),

@@ -1,12 +1,3 @@
-<script lang="ts" module>
-	export type LocationOption = {
-		id: number;
-		name: string;
-		color: string;
-		address?: string;
-	};
-</script>
-
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -15,27 +6,69 @@
 		DialogHeader,
 		DialogTitle
 	} from '$lib/components/ui/dialog';
+	import {
+		breakMinuteLabels,
+		breakMinuteOptions,
+		recurrenceFrequencyLabels,
+		recurrenceFrequencyValues
+	} from '$lib/schedule/constants';
+	import { addShift, getSchedule, type LocationOption } from '$lib/schedule/shifts.remote';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
 
 	let {
 		locations,
 		initialDate,
+		currentWeekQuery,
 		onCancel
 	}: {
 		locations: LocationOption[];
 		initialDate: string;
+		currentWeekQuery: string | null;
 		onCancel: () => void;
 	} = $props();
 
-	let startTime = $state('09:00');
-	let endTime = $state('17:00');
-	let breakMinutes = $state('30');
-	let recurrenceFrequency = $state('none');
-	let selectedLocationId = $state('');
+	let initializedFor = '';
 
 	const fieldClass =
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50';
 	const labelClass = 'text-xs font-semibold text-muted-foreground uppercase';
+	const issueClass = 'text-xs font-medium text-destructive';
+
+	const defaultLocationId = $derived(locations[0]?.id.toString() ?? '');
+	const defaultFormKey = $derived(`${initialDate}:${defaultLocationId}`);
+	const activeLocationId = $derived(
+		String(addShift.fields.locationId.value() || defaultLocationId)
+	);
+	const startTime = $derived(String(addShift.fields.startTime.value() || '09:00'));
+	const endTime = $derived(String(addShift.fields.endTime.value() || '17:00'));
+	const breakMinutes = $derived(
+		String(addShift.fields.breakMinutes.value() || breakMinuteOptions[0])
+	);
+	const recurrenceFrequency = $derived(
+		String(addShift.fields.recurrenceFrequency.value() || recurrenceFrequencyValues[0])
+	);
+	const selectedLocation = $derived(
+		locations.find((location) => location.id.toString() === activeLocationId) ?? locations[0]
+	);
+	const defaultFormValues = $derived({
+		locationId: defaultLocationId,
+		shiftDate: initialDate,
+		startTime: '09:00',
+		endTime: '17:00',
+		breakMinutes: breakMinuteOptions[0],
+		recurrenceFrequency: recurrenceFrequencyValues[0],
+		recurrenceUntil: '',
+		notes: ''
+	});
+
+	$effect(() => {
+		if (initializedFor === defaultFormKey) return;
+
+		initializedFor = defaultFormKey;
+		addShift.fields.set(defaultFormValues);
+	});
 
 	function getShiftMinutes() {
 		const [startHour, startMinute] = startTime.split(':').map(Number);
@@ -56,21 +89,29 @@
 	const formattedHours = $derived(
 		`${Number.isInteger(totalHours) ? totalHours : totalHours.toFixed(1)}h`
 	);
-	const activeLocationId = $derived(selectedLocationId || (locations[0]?.id.toString() ?? ''));
-	const selectedLocation = $derived(
-		locations.find((location) => location.id.toString() === activeLocationId) ?? locations[0]
-	);
 
-	function preventPlaceholderSubmit(event: SubmitEvent) {
-		event.preventDefault();
-	}
-
-	function updateSelectedLocation(event: Event) {
-		selectedLocationId = (event.currentTarget as HTMLSelectElement).value;
+	function resetForm(element: HTMLFormElement) {
+		element.reset();
+		addShift.fields.set(defaultFormValues);
 	}
 </script>
 
-<form onsubmit={preventPlaceholderSubmit}>
+<form
+	{...addShift.enhance(async (form) => {
+		const submitted = await form.submit().updates(getSchedule(currentWeekQuery));
+		if (!submitted || !addShift.result?.success) return;
+
+		resetForm(form.element);
+		onCancel();
+
+		if (addShift.result.weekStart !== initialDate) {
+			await goto(resolve(`/?week=${addShift.result.weekStart}`), {
+				keepFocus: true,
+				noScroll: true
+			});
+		}
+	})}
+>
 	<header class="border-b px-4 py-4 pr-12">
 		<DialogHeader>
 			<DialogTitle>Add shift</DialogTitle>
@@ -90,17 +131,23 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
+						{...addShift.fields.locationId.as('select', defaultLocationId)}
 						class={`${fieldClass} pl-9`}
-						name="locationId"
-						value={activeLocationId}
-						onchange={updateSelectedLocation}
 						required
+						disabled={locations.length === 0}
 					>
-						{#each locations as location (location.id)}
-							<option value={location.id}>{location.name}</option>
-						{/each}
+						{#if locations.length === 0}
+							<option value="">No locations available</option>
+						{:else}
+							{#each locations as location (location.id)}
+								<option value={location.id}>{location.name}</option>
+							{/each}
+						{/if}
 					</select>
 				</span>
+				{#each addShift.fields.locationId.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 
 			<label class="space-y-2">
@@ -110,13 +157,14 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
+						{...addShift.fields.shiftDate.as('date', initialDate)}
 						class={`${fieldClass} pl-9`}
-						name="shiftDate"
-						type="date"
-						value={initialDate}
 						required
 					/>
 				</span>
+				{#each addShift.fields.shiftDate.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 
 			<label class="space-y-2">
@@ -125,14 +173,18 @@
 					<Utensils
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
-					<select bind:value={breakMinutes} class={`${fieldClass} pl-9`} name="breakMinutes">
-						<option value="0">No break</option>
-						<option value="15">15 minutes</option>
-						<option value="30">30 minutes</option>
-						<option value="45">45 minutes</option>
-						<option value="60">60 minutes</option>
+					<select
+						{...addShift.fields.breakMinutes.as('select', breakMinuteOptions[0])}
+						class={`${fieldClass} pl-9`}
+					>
+						{#each breakMinuteOptions as option (option)}
+							<option value={option}>{breakMinuteLabels[option]}</option>
+						{/each}
 					</select>
 				</span>
+				{#each addShift.fields.breakMinutes.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 
 			<label class="space-y-2">
@@ -142,13 +194,14 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						bind:value={startTime}
+						{...addShift.fields.startTime.as('time', '09:00')}
 						class={`${fieldClass} pl-9`}
-						name="startTime"
-						type="time"
 						required
 					/>
 				</span>
+				{#each addShift.fields.startTime.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 
 			<label class="space-y-2">
@@ -158,13 +211,14 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						bind:value={endTime}
+						{...addShift.fields.endTime.as('time', '17:00')}
 						class={`${fieldClass} pl-9`}
-						name="endTime"
-						type="time"
 						required
 					/>
 				</span>
+				{#each addShift.fields.endTime.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 
 			<label class="space-y-2">
@@ -174,25 +228,29 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
-						bind:value={recurrenceFrequency}
+						{...addShift.fields.recurrenceFrequency.as('select', recurrenceFrequencyValues[0])}
 						class={`${fieldClass} pl-9`}
-						name="recurrenceFrequency"
 					>
-						<option value="none">None</option>
-						<option value="weekly">Weekly</option>
-						<option value="biweekly">Biweekly</option>
+						{#each recurrenceFrequencyValues as option (option)}
+							<option value={option}>{recurrenceFrequencyLabels[option]}</option>
+						{/each}
 					</select>
 				</span>
+				{#each addShift.fields.recurrenceFrequency.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 
 			<label class="space-y-2">
 				<span class={labelClass}>Repeat until</span>
 				<input
+					{...addShift.fields.recurrenceUntil.as('date')}
 					class={fieldClass}
 					disabled={recurrenceFrequency === 'none'}
-					name="recurrenceUntil"
-					type="date"
 				/>
+				{#each addShift.fields.recurrenceUntil.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 		</div>
 
@@ -224,17 +282,22 @@
 						class="pointer-events-none absolute top-3 left-3 size-4 text-muted-foreground"
 					/>
 					<textarea
+						{...addShift.fields.notes.as('text')}
 						class={`${fieldClass} min-h-32 resize-none pl-9`}
-						name="notes"
 						placeholder="Coverage, handoff, or staffing notes"
 					></textarea>
 				</span>
+				{#each addShift.fields.notes.issues() ?? [] as issue (issue.message)}
+					<p class={issueClass}>{issue.message}</p>
+				{/each}
 			</label>
 		</aside>
 	</div>
 
 	<DialogFooter class="mx-0 mb-0 rounded-none border-t px-4 py-4">
-		<Button variant="outline" onclick={onCancel}>Cancel</Button>
-		<Button type="submit">Add shift</Button>
+		<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
+		<Button type="submit" disabled={locations.length === 0 || addShift.pending > 0}>
+			{addShift.pending > 0 ? 'Adding...' : 'Add shift'}
+		</Button>
 	</DialogFooter>
 </form>

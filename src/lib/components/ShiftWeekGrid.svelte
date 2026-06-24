@@ -1,92 +1,28 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import type { ScheduledShift } from '$lib/schedule/shifts.remote';
 	import { formatDayLabel, getWeekDays } from '$lib/schedule/week';
 	import type { CalendarDate } from '@internationalized/date';
 	import { Clock3, Plus, RefreshCw } from '@lucide/svelte';
 
-	type Shift = {
-		id: number;
-		location: string;
-		time: string;
-		hours: string;
-		frequency: 'Weekly';
-	};
-
 	type ShiftDay = {
 		id: string;
 		label: string;
-		shifts: Shift[];
+		shifts: ScheduledShift[];
 	};
 
-	let { weekStart }: { weekStart: CalendarDate } = $props();
-
-	const demoShiftsByDay: Shift[][] = [
-		[
-			{
-				id: 5,
-				location: 'Northern Met',
-				time: '6:00 AM - 3:00 PM',
-				hours: '9 hours',
-				frequency: 'Weekly'
-			},
-			{
-				id: 6,
-				location: 'Pine Valley',
-				time: '5:00 PM - 12:00 AM',
-				hours: '7 hours',
-				frequency: 'Weekly'
-			}
-		],
-		[],
-		[],
-		[
-			{
-				id: 1,
-				location: 'Pine Valley',
-				time: '7:00 PM - 12:00 AM',
-				hours: '5 hours',
-				frequency: 'Weekly'
-			}
-		],
-		[
-			{
-				id: 2,
-				location: 'Pine Valley',
-				time: '4:30 PM - 12:00 AM',
-				hours: '7.5 hours',
-				frequency: 'Weekly'
-			}
-		],
-		[
-			{
-				id: 3,
-				location: 'Pine Valley',
-				time: '4:30 PM - 12:00 AM',
-				hours: '7.5 hours',
-				frequency: 'Weekly'
-			}
-		],
-		[
-			{
-				id: 4,
-				location: 'Pine Valley',
-				time: '8:00 PM - 12:00 AM',
-				hours: '4 hours',
-				frequency: 'Weekly'
-			}
-		]
-	];
+	let { weekStart, shifts }: { weekStart: CalendarDate; shifts: ScheduledShift[] } = $props();
 
 	const days: ShiftDay[] = $derived(
-		getWeekDays(weekStart).map((date, index) => ({
+		getWeekDays(weekStart).map((date) => ({
 			id: date.toString(),
 			label: formatDayLabel(date),
-			shifts: demoShiftsByDay[index] ?? []
+			shifts: shifts.filter((shift) => shift.shiftDate === date.toString())
 		}))
 	);
 
 	const getDayHours = (day: ShiftDay) =>
-		day.shifts.reduce((total, shift) => total + Number.parseFloat(shift.hours), 0);
+		day.shifts.reduce((total, shift) => total + shift.hoursValue, 0);
 
 	const formatHours = (hours: number) => `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
 
@@ -126,7 +62,8 @@
 				{:else}
 					{#each day.shifts as shift (shift.id)}
 						<article
-							class="rounded-lg border border-l-4 border-l-primary bg-background p-3 shadow-sm transition-colors duration-200 hover:bg-muted/35"
+							class="rounded-lg border border-l-4 bg-background p-3 shadow-sm transition-colors duration-200 hover:bg-muted/35"
+							style:border-left-color={shift.locationColor}
 						>
 							<header class="space-y-1.5">
 								<h3 class="truncate text-sm font-bold">
