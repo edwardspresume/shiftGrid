@@ -3,7 +3,17 @@
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
+	import {
+		DEFAULT_WEEK_STARTS_ON,
+		getCurrentWeekStart,
+		getWeekStart,
+		type WeekStartsOn
+	} from '$lib/schedule/week';
+	import type { DateValue } from '@internationalized/date';
 	import { BriefcaseBusiness, Clock3, MapPin, Plus } from '@lucide/svelte';
+
+	const weekStartsOn: WeekStartsOn = DEFAULT_WEEK_STARTS_ON;
+	let weekStart = $state(getCurrentWeekStart(weekStartsOn));
 
 	const summaryStats = [
 		{
@@ -22,6 +32,22 @@
 			icon: MapPin
 		}
 	];
+
+	function goToPreviousWeek() {
+		weekStart = weekStart.subtract({ days: 7 });
+	}
+
+	function goToNextWeek() {
+		weekStart = weekStart.add({ days: 7 });
+	}
+
+	function goToThisWeek() {
+		weekStart = getCurrentWeekStart(weekStartsOn);
+	}
+
+	function applySelectedDate(date: DateValue) {
+		weekStart = getWeekStart(date, weekStartsOn);
+	}
 </script>
 
 <SiteHeader />
@@ -32,7 +58,14 @@
 			<div class="space-y-4">
 				<p class="font-heading text-2xl leading-none font-black tracking-normal">Weekly schedule</p>
 
-				<WeekSelector />
+				<WeekSelector
+					{weekStart}
+					{weekStartsOn}
+					onPreviousWeek={goToPreviousWeek}
+					onNextWeek={goToNextWeek}
+					onThisWeek={goToThisWeek}
+					onApplyDate={applySelectedDate}
+				/>
 			</div>
 
 			<Button size="lg">
@@ -60,5 +93,5 @@
 		</section>
 	</header>
 
-	<ShiftWeekGrid />
+	<ShiftWeekGrid {weekStart} />
 </main>

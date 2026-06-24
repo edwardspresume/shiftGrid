@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import { formatDayLabel, getWeekDays } from '$lib/schedule/week';
+	import type { CalendarDate } from '@internationalized/date';
 	import { Clock3, Plus, RefreshCw } from '@lucide/svelte';
 
 	type Shift = {
@@ -16,90 +18,72 @@
 		shifts: Shift[];
 	};
 
-	const days: ShiftDay[] = [
-		{
-			id: 'mon-jun-1',
-			label: 'Mon, Jun 1',
-			shifts: []
-		},
-		{
-			id: 'tue-jun-2',
-			label: 'Tue, Jun 2',
-			shifts: []
-		},
-		{
-			id: 'wed-jun-3',
-			label: 'Wed, Jun 3',
-			shifts: [
-				{
-					id: 1,
-					location: 'Pine Valley',
-					time: '7:00 PM - 12:00 AM',
-					hours: '5 hours',
-					frequency: 'Weekly'
-				}
-			]
-		},
-		{
-			id: 'thu-jun-4',
-			label: 'Thu, Jun 4',
-			shifts: [
-				{
-					id: 2,
-					location: 'Pine Valley',
-					time: '4:30 PM - 12:00 AM',
-					hours: '7.5 hours',
-					frequency: 'Weekly'
-				}
-			]
-		},
-		{
-			id: 'fri-jun-5',
-			label: 'Fri, Jun 5',
-			shifts: [
-				{
-					id: 3,
-					location: 'Pine Valley',
-					time: '4:30 PM - 12:00 AM',
-					hours: '7.5 hours',
-					frequency: 'Weekly'
-				}
-			]
-		},
-		{
-			id: 'sat-jun-6',
-			label: 'Sat, Jun 6',
-			shifts: [
-				{
-					id: 4,
-					location: 'Pine Valley',
-					time: '8:00 PM - 12:00 AM',
-					hours: '4 hours',
-					frequency: 'Weekly'
-				}
-			]
-		},
-		{
-			id: 'sun-jun-7',
-			label: 'Sun, Jun 7',
-			shifts: [
-				{
-					id: 5,
-					location: 'Northern Met',
-					time: '6:00 AM - 3:00 PM',
-					hours: '9 hours',
-					frequency: 'Weekly'
-				},
-				{
-					id: 6,
-					location: 'Pine Valley',
-					time: '5:00 PM - 12:00 AM',
-					hours: '7 hours',
-					frequency: 'Weekly'
-				}
-			]
-		}
+	let { weekStart }: { weekStart: CalendarDate } = $props();
+
+	const demoShiftsByDay: Shift[][] = [
+		[
+			{
+				id: 5,
+				location: 'Northern Met',
+				time: '6:00 AM - 3:00 PM',
+				hours: '9 hours',
+				frequency: 'Weekly'
+			},
+			{
+				id: 6,
+				location: 'Pine Valley',
+				time: '5:00 PM - 12:00 AM',
+				hours: '7 hours',
+				frequency: 'Weekly'
+			}
+		],
+		[],
+		[],
+		[
+			{
+				id: 1,
+				location: 'Pine Valley',
+				time: '7:00 PM - 12:00 AM',
+				hours: '5 hours',
+				frequency: 'Weekly'
+			}
+		],
+		[
+			{
+				id: 2,
+				location: 'Pine Valley',
+				time: '4:30 PM - 12:00 AM',
+				hours: '7.5 hours',
+				frequency: 'Weekly'
+			}
+		],
+		[
+			{
+				id: 3,
+				location: 'Pine Valley',
+				time: '4:30 PM - 12:00 AM',
+				hours: '7.5 hours',
+				frequency: 'Weekly'
+			}
+		],
+		[
+			{
+				id: 4,
+				location: 'Pine Valley',
+				time: '8:00 PM - 12:00 AM',
+				hours: '4 hours',
+				frequency: 'Weekly'
+			}
+		]
 	];
+
+	const days: ShiftDay[] = $derived(
+		getWeekDays(weekStart).map((date, index) => ({
+			id: date.toString(),
+			label: formatDayLabel(date),
+			shifts: demoShiftsByDay[index] ?? []
+		}))
+	);
 
 	const getDayHours = (day: ShiftDay) =>
 		day.shifts.reduce((total, shift) => total + Number.parseFloat(shift.hours), 0);
