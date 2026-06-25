@@ -12,7 +12,7 @@ import { isClockInput } from '$lib/schedule/time';
 export const scheduleWeekSchema = v.nullish(v.string());
 export const deleteShiftScopeValues = ['single', 'series'] as const;
 export const editShiftScopeValues = ['single', 'series'] as const;
-export const locationColorValues = [
+export const teamMemberColorValues = [
 	'#16a34a',
 	'#2563eb',
 	'#dc2626',
@@ -22,23 +22,23 @@ export const locationColorValues = [
 	'#475569'
 ] as const;
 
-export const addLocationSchema = v.object({
+export const addTeamMemberSchema = v.object({
 	name: v.pipe(
-		v.string('Enter a location name.'),
+		v.string('Enter a team member name.'),
 		v.trim(),
-		v.minLength(1, 'Enter a location name.'),
-		v.maxLength(80, 'Location names must be 80 characters or less.')
+		v.minLength(1, 'Enter a team member name.'),
+		v.maxLength(80, 'Team member names must be 80 characters or less.')
 	),
-	color: v.picklist(locationColorValues, 'Choose a location color.')
+	color: v.picklist(teamMemberColorValues, 'Choose a team member color.')
 });
 
 const shiftFormFields = {
-	locationId: v.pipe(
-		v.string('Choose a location.'),
+	teamMemberId: v.pipe(
+		v.string('Choose a team member.'),
 		v.trim(),
 		v.transform(Number),
-		v.integer('Choose a location.'),
-		v.minValue(1, 'Choose a location.')
+		v.integer('Choose a team member.'),
+		v.minValue(1, 'Choose a team member.')
 	),
 	shiftDate: v.pipe(
 		v.string('Choose a shift date.'),

@@ -22,12 +22,12 @@
 	import {
 		editShift,
 		getSchedule,
-		type LocationOption,
+		type TeamMemberOption,
 		type ScheduledShift
 	} from '$lib/schedule/shifts.remote';
 	import { formatClockTime, formatCompactHours, getShiftHours } from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
-	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
+	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound, Utensils } from '@lucide/svelte';
 
 	type EditScope = 'single' | 'series';
 	type RepeatUntilPreset = {
@@ -36,13 +36,13 @@
 	};
 
 	let {
-		locations,
+		teamMembers,
 		shift,
 		visibleWeekStart,
 		currentWeekQuery,
 		onCancel
 	}: {
-		locations: LocationOption[];
+		teamMembers: TeamMemberOption[];
 		shift: ScheduledShift;
 		visibleWeekStart: string;
 		currentWeekQuery: string | null;
@@ -61,11 +61,11 @@
 		{ label: '1 month', duration: { months: 1 } },
 		{ label: '3 months', duration: { months: 3 } }
 	];
-	const defaultLocationId = $derived(shift.locationId.toString());
+	const defaultTeamMemberId = $derived(shift.teamMemberId.toString());
 	const defaultFormKey = $derived(`${shift.ruleId}:${shift.baseShiftDate}:${shift.shiftDate}`);
 	const sourceIsRecurring = $derived(shift.recurrenceFrequency !== 'none');
-	const activeLocationId = $derived(
-		String(editShift.fields.locationId.value() || defaultLocationId)
+	const activeTeamMemberId = $derived(
+		String(editShift.fields.teamMemberId.value() || defaultTeamMemberId)
 	);
 	const shiftDate = $derived(
 		String(
@@ -83,10 +83,10 @@
 	);
 	const recurrenceUntil = $derived(String(editShift.fields.recurrenceUntil.value() || ''));
 	const isRecurring = $derived(recurrenceFrequency !== 'none');
-	const selectedLocation = $derived(
-		locations.find((location) => location.id.toString() === activeLocationId) ??
-			locations.find((location) => location.id === shift.locationId) ??
-			locations[0]
+	const selectedTeamMember = $derived(
+		teamMembers.find((teamMember) => teamMember.id.toString() === activeTeamMemberId) ??
+			teamMembers.find((teamMember) => teamMember.id === shift.teamMemberId) ??
+			teamMembers[0]
 	);
 
 	$effect(() => {
@@ -133,7 +133,7 @@
 		return {
 			id: shift.ruleId.toString(),
 			occurrenceDate: shift.shiftDate,
-			locationId: shift.locationId.toString(),
+			teamMemberId: shift.teamMemberId.toString(),
 			shiftDate: activeShiftDate,
 			startTime: shift.startTime,
 			endTime: shift.endTime,
@@ -181,7 +181,7 @@
 		editShift.fields.set({
 			id: shift.ruleId.toString(),
 			occurrenceDate: shift.shiftDate,
-			locationId: activeLocationId,
+			teamMemberId: activeTeamMemberId,
 			shiftDate,
 			startTime,
 			endTime,
@@ -227,7 +227,7 @@
 	<DialogHeader class="border-b p-4">
 		<DialogTitle>Edit shift</DialogTitle>
 		<DialogDescription class="sr-only">
-			Update a scheduled shift with location, date, time, break, recurrence, and notes.
+			Update a scheduled shift with team member, date, time, break, recurrence, and notes.
 		</DialogDescription>
 		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
 	</DialogHeader>
@@ -277,27 +277,27 @@
 			{/if}
 
 			<label class="space-y-2 md:col-span-2">
-				<span class={labelClass}>Location</span>
+				<span class={labelClass}>Team member</span>
 				<span class="relative block">
-					<MapPin
+					<UserRound
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
-						{...editShift.fields.locationId.as('select', defaultLocationId)}
+						{...editShift.fields.teamMemberId.as('select', defaultTeamMemberId)}
 						class={`${fieldClass} pl-9`}
 						required
-						disabled={locations.length === 0}
+						disabled={teamMembers.length === 0}
 					>
-						{#if locations.length === 0}
-							<option value="">No locations available</option>
+						{#if teamMembers.length === 0}
+							<option value="">No team members available</option>
 						{:else}
-							{#each locations as location (location.id)}
-								<option value={location.id.toString()}>{location.name}</option>
+							{#each teamMembers as teamMember (teamMember.id)}
+								<option value={teamMember.id.toString()}>{teamMember.name}</option>
 							{/each}
 						{/if}
 					</select>
 				</span>
-				{#each editShift.fields.locationId.issues() ?? [] as issue (issue.message)}
+				{#each editShift.fields.teamMemberId.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -469,9 +469,9 @@
 				<p class={labelClass}>Preview</p>
 				<div
 					class="rounded-lg border border-l-4 bg-background p-3 shadow-sm"
-					style:border-left-color={selectedLocation?.color}
+					style:border-left-color={selectedTeamMember?.color}
 				>
-					<p class="text-sm font-bold">{selectedLocation?.name ?? 'Location'}</p>
+					<p class="text-sm font-bold">{selectedTeamMember?.name ?? 'Team member'}</p>
 					<p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
 						<Clock3 class="size-3.5" />
 						{formattedTimeRange}
@@ -503,7 +503,7 @@
 		<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
 		<Button
 			{...editShift.fields.scope.as('submit', editScope)}
-			disabled={locations.length === 0 || editShift.pending > 0}
+			disabled={teamMembers.length === 0 || editShift.pending > 0}
 		>
 			{editShift.pending > 0
 				? 'Saving...'

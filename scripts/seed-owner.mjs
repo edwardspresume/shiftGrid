@@ -2,19 +2,9 @@ import 'dotenv/config';
 
 import { neon } from '@neondatabase/serverless';
 import { hashPassword } from 'better-auth/crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
-import {
-	boolean,
-	date,
-	integer,
-	pgEnum,
-	pgTable,
-	serial,
-	text,
-	time,
-	timestamp
-} from 'drizzle-orm/pg-core';
+import { boolean, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 if (!process.env.DATABASE_URL) {
 	throw new Error('DATABASE_URL is not set');
@@ -35,10 +25,13 @@ if (!ownerPassword || ownerPassword.length < 8) {
 	throw new Error('SHIFTGRID_OWNER_PASSWORD or AUTH_SEED_PASSWORD must be at least 8 characters');
 }
 
+const userRole = pgEnum('user_role', ['system_admin', 'scheduler', 'receptionist']);
+
 const user = pgTable('user', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
 	email: text('email').notNull().unique(),
+	role: userRole('role').default('receptionist').notNull(),
 	emailVerified: boolean('email_verified').default(false).notNull(),
 	image: text('image'),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -63,35 +56,6 @@ const account = pgTable('account', {
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
-const recurrenceFrequency = pgEnum('recurrence_frequency', ['none', 'weekly', 'biweekly']);
-
-const locations = pgTable('locations', {
-	id: serial('id').primaryKey(),
-	userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-	name: text('name').notNull(),
-	color: text('color').notNull().default('#16a34a'),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
-
-const shifts = pgTable('shifts', {
-	id: serial('id').primaryKey(),
-	userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-	locationId: integer('location_id')
-		.notNull()
-		.references(() => locations.id, { onDelete: 'restrict' }),
-	shiftDate: date('shift_date').notNull(),
-	startTime: time('start_time').notNull(),
-	endTime: time('end_time').notNull(),
-	breakMinutes: integer('break_minutes').notNull().default(0),
-	recurrenceFrequency: recurrenceFrequency('recurrence_frequency').notNull().default('none'),
-	recurrenceUntil: date('recurrence_until'),
-	recurrenceDays: integer('recurrence_days').array(),
-	notes: text('notes'),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
-
 const client = neon(process.env.DATABASE_URL);
 const db = drizzle(client);
 const now = new Date();
@@ -109,6 +73,7 @@ if (existingUser) {
 		.update(user)
 		.set({
 			name: ownerName,
+			role: 'system_admin',
 			emailVerified: true,
 			updatedAt: now
 		})
@@ -118,6 +83,7 @@ if (existingUser) {
 		id: userId,
 		name: ownerName,
 		email: ownerEmail,
+		role: 'system_admin',
 		emailVerified: true,
 		createdAt: now,
 		updatedAt: now
@@ -149,19 +115,5 @@ if (updatedAccounts.length === 0) {
 	});
 }
 
-const claimedLocations = await db
-	.update(locations)
-	.set({ userId, updatedAt: now })
-	.where(isNull(locations.userId))
-	.returning({ id: locations.id });
-
-const claimedShifts = await db
-	.update(shifts)
-	.set({ userId, updatedAt: now })
-	.where(isNull(shifts.userId))
-	.returning({ id: shifts.id });
-
 console.log(`Owner account ready: ${ownerEmail}`);
-console.log(
-	`Claimed ${claimedLocations.length} unowned location row(s) and ${claimedShifts.length} unowned shift row(s).`
-);
+console.log('Owner role set to system_admin.');

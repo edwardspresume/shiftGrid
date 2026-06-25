@@ -4,7 +4,7 @@
 
 ## Product Shape
 
-ShiftGrid currently centers on a single weekly schedule view. Users choose a week, review scheduled shifts by day, and add shifts from the individual day column where the shift will appear.
+ShiftGrid currently centers on a shared weekly schedule view. Users choose a week, review scheduled shifts by day, and users with scheduler permissions add shifts from the individual day column where the shift will appear.
 
 The app is operational rather than marketing-focused: the main screen is the working schedule grid, a compact weekly summary, and week navigation.
 
@@ -12,22 +12,24 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 - Invite-only access using Better Auth email/password authentication.
 - Public registration is disabled; the initial owner account is seeded with `pnpm auth:seed-owner` using `SHIFTGRID_OWNER_*` or `AUTH_SEED_*` environment variables.
+- User roles are `system_admin`, `scheduler`, and `receptionist`.
+- `system_admin` and `scheduler` users can create team members and create/edit/delete shifts. `receptionist` users can view the schedule.
 - Weekly schedule grid with one column per day.
 - Week navigation for previous week, next week, current week, and date-based week selection.
-- Summary stats for total scheduled hours, shift count, and active location count.
+- Summary stats for total scheduled hours, shift count, and team member count.
 - Per-day add-shift buttons that open a modal form with the date fixed to that day.
-- Users can create owned locations from the weekly schedule page.
-- Shift form fields for location, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
+- Schedulers can create shared team members from the weekly schedule page or the `/team-members` page.
+- Shift form fields for team member, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
 - Recurring shift forms include repeat-until presets for 2 weeks, 1 month, and 3 months while keeping the exact date input editable.
-- Shift cards show location, recurrence label, time range, total hours, and notes when present.
+- Shift cards show team member, recurrence label, time range, total hours, and notes when present.
 - Shift cards include a three-dot actions menu with edit and delete actions.
 - Overnight shifts are supported by treating an end time earlier than or equal to the start time as next-day coverage.
 - Light and dark theme support through the existing theme toggle.
 
 ## Scheduling Rules
 
-- Shifts cannot overlap existing coverage, including overnight boundaries.
-- Overlap checks compare expanded occurrence ranges, so one-time shifts cannot collide with recurring occurrences and recurring shifts cannot collide with existing one-time or recurring shifts.
+- Shifts cannot overlap existing coverage for the same team member, including overnight boundaries.
+- Overlap checks compare expanded occurrence ranges for the assigned team member, so one-time shifts cannot collide with that team member's recurring occurrences and recurring shifts cannot collide with that team member's existing one-time or recurring shifts.
 - Recurrence frequencies are currently `none`, `weekly`, and `biweekly`.
 - Weekly and biweekly shifts require a repeat-until date.
 - Weekly and biweekly shifts require at least one selected repeat weekday.
@@ -41,10 +43,10 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 ## Data Model
 
-- `locations` stores `id`, `user_id`, `name`, `color`, and timestamps.
-- `locations` stores non-null `user_id` ownership. The ownership migration backfills existing rows to the first existing user, or removes only the known demo seed locations on empty fresh databases.
-- `shifts` stores non-null `user_id` ownership plus the scheduling rule: location, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, and timestamps.
-- `shifts` must reference a location owned by the same user through the composite `(user_id, location_id)` to `locations(user_id, id)` foreign key.
+- `user.role` stores the role enum used for application-level permissions.
+- `team_members` stores the shared assignable people list: `id`, `name`, `color`, audit user ids, and timestamps.
+- `shifts` stores the scheduling rule: `team_member_id`, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, audit user ids, and timestamps.
+- `shifts.team_member_id` references the shared `team_members` table. Shift overlap validation is scoped to that team member.
 - `shift_exceptions` stores per-occurrence changes for recurring series. It currently supports constrained `cancelled` occurrences.
 - Better Auth tables (`user`, `session`, `account`, `verification`) support email/password login. Password credentials are stored in `account` rows with `provider_id = 'credential'`.
 
@@ -52,23 +54,27 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 - Remote functions live in `src/lib/schedule/shifts.remote.ts`.
 - Auth form remote functions live in `src/lib/auth/auth.remote.ts`.
-- Schedule queries and mutations require an authenticated Better Auth session and only read/write rows owned by `locals.user.id`.
+- Current-user role/capability lookup uses `getCurrentUser()` in `src/lib/auth/auth.remote.ts`; it intentionally avoids route `load` data.
+- Schedule queries require an authenticated Better Auth session and read the shared schedule.
+- Schedule mutations require `system_admin` or `scheduler`.
 - `getSchedule(week)` returns only the requested week's expanded shift occurrences and weekly summary.
-- `getLocations()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static location data.
-- `addLocation` validates a user-owned location name/color, relies on the per-user unique location-name constraint to block duplicates, inserts with `locals.user.id`, and refreshes `getLocations()`.
-- `addShift` validates input, checks location existence, checks overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
+- `getTeamMembers()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static team member data.
+- `addTeamMember` validates a shared team member name/color, requires `system_admin` or `scheduler`, relies on the global unique team-member name constraint to block duplicates, stores audit user ids, and refreshes `getTeamMembers()`.
+- `addShift` validates input, checks team member existence, checks same-team-member overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
 - `editShift` validates the same scheduling rules, updates standalone shifts and recurring series in place, or individualizes one recurring occurrence by cancelling the source occurrence and inserting a non-recurring shift. Series edits clear cancellation exceptions when the recurrence pattern changes and accept one requested `getSchedule` refresh.
 - `deleteShift` deletes one-time shifts directly, deletes recurring series directly, or creates a cancelled occurrence exception for a single recurring shift.
-- Shift add/edit/delete operations run inside a pooled Postgres transaction with a per-user advisory transaction lock so overlap validation and writes are serialized for each user.
+- Shift add/edit/delete operations run inside a pooled Postgres transaction with a shared schedule advisory transaction lock so overlap validation and writes are serialized for the shared schedule.
 - Shift forms submit with `form.submit().updates(getSchedule(currentWeekQuery))`, keeping refresh scoped to the visible schedule query and avoiding a full app invalidation.
 
 ## Important Source Areas
 
 - `src/routes/+page.svelte`: main schedule page, week state, modal state, and remote query usage.
+- `src/routes/team-members/+page.svelte`: shared team member list and team member creation entry point.
 - `src/routes/login/+page.svelte`: invite-only email/password login form.
 - `src/lib/auth/auth.remote.ts`: login/logout remote forms backed by Better Auth.
 - `scripts/seed-owner.mjs`: environment-driven owner account seeding for invite-only deployments.
-- `src/lib/components/AddLocationForm.svelte`: add-location remote form UI.
+- `src/lib/server/roles.ts`: role capability helpers and server-side mutation guards.
+- `src/lib/components/AddTeamMemberForm.svelte`: add-team-member remote form UI.
 - `src/lib/components/ShiftWeekGrid.svelte`: weekly grid, day columns, shift cards, and day-level add actions.
 - `src/lib/components/AddShiftForm.svelte`: add-shift remote form UI, field defaults, recurrence controls, and scoped post-submit refresh.
 - `src/lib/components/EditShiftForm.svelte`: edit-shift remote form UI for updating standalone shifts, updating recurring series, or individualizing a recurring occurrence.
@@ -76,14 +82,14 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - `src/lib/schedule/shiftValidation.ts`: Valibot schema for add-shift form validation.
 - `src/lib/schedule/time.ts`: clock parsing, display formatting, hours calculation, and overlap math.
 - `src/lib/schedule/week.ts`: week-start and day-list helpers.
-- `src/lib/server/db/schema.ts`: Drizzle schema for locations, shifts, and auth exports.
+- `src/lib/server/db/schema.ts`: Drizzle schema for team members, shifts, and auth exports.
 - `src/routes/page.svelte.e2e.ts`: durable Playwright coverage for add-shift and recurrence behavior.
 
 ## Known Product Gaps
 
 - There is no "this and future shifts" edit/delete behavior yet. That requires splitting a recurring rule at the selected occurrence date.
 - Recurrence supports weekly and biweekly weekday patterns; monthly and end-after-N-occurrences rules do not exist yet.
-- Location editing/deletion UI is not present in the main scheduling workflow.
+- Team member editing/deletion UI is not present yet; current management supports creation and listing.
 
 ## Maintenance Notes For Agents
 

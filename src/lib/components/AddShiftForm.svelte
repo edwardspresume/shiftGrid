@@ -18,7 +18,7 @@
 		recurrenceFrequencyValues
 	} from '$lib/schedule/constants';
 	import { parseCanonicalDate } from '$lib/schedule/date';
-	import { addShift, getSchedule, type LocationOption } from '$lib/schedule/shifts.remote';
+	import { addShift, getSchedule, type TeamMemberOption } from '$lib/schedule/shifts.remote';
 	import {
 		DEFAULT_END_TIME,
 		DEFAULT_START_TIME,
@@ -27,7 +27,7 @@
 		getShiftHours
 	} from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
-	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
+	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound, Utensils } from '@lucide/svelte';
 
 	type RepeatUntilPreset = {
 		label: string;
@@ -35,13 +35,13 @@
 	};
 
 	let {
-		locations,
+		teamMembers,
 		initialDate,
 		visibleWeekStart,
 		currentWeekQuery,
 		onCancel
 	}: {
-		locations: LocationOption[];
+		teamMembers: TeamMemberOption[];
 		initialDate: string;
 		visibleWeekStart: string;
 		currentWeekQuery: string | null;
@@ -60,10 +60,10 @@
 		{ label: '3 months', duration: { months: 3 } }
 	];
 
-	const defaultLocationId = $derived(locations[0]?.id.toString() ?? '');
-	const defaultFormKey = $derived(`${initialDate}:${defaultLocationId}`);
-	const activeLocationId = $derived(
-		String(addShift.fields.locationId.value() || defaultLocationId)
+	const defaultTeamMemberId = $derived(teamMembers[0]?.id.toString() ?? '');
+	const defaultFormKey = $derived(`${initialDate}:${defaultTeamMemberId}`);
+	const activeTeamMemberId = $derived(
+		String(addShift.fields.teamMemberId.value() || defaultTeamMemberId)
 	);
 	const shiftDate = $derived(String(addShift.fields.shiftDate.value() || initialDate));
 	const startTime = $derived(String(addShift.fields.startTime.value() || DEFAULT_START_TIME));
@@ -76,11 +76,12 @@
 	);
 	const recurrenceUntil = $derived(String(addShift.fields.recurrenceUntil.value() || ''));
 	const isRecurring = $derived(recurrenceFrequency !== 'none');
-	const selectedLocation = $derived(
-		locations.find((location) => location.id.toString() === activeLocationId) ?? locations[0]
+	const selectedTeamMember = $derived(
+		teamMembers.find((teamMember) => teamMember.id.toString() === activeTeamMemberId) ??
+			teamMembers[0]
 	);
 	const defaultFormValues = $derived({
-		locationId: defaultLocationId,
+		teamMemberId: defaultTeamMemberId,
 		shiftDate: initialDate,
 		startTime: DEFAULT_START_TIME,
 		endTime: DEFAULT_END_TIME,
@@ -139,7 +140,7 @@
 		if (!presetDate) return;
 
 		addShift.fields.set({
-			locationId: activeLocationId,
+			teamMemberId: activeTeamMemberId,
 			shiftDate,
 			startTime,
 			endTime,
@@ -182,7 +183,7 @@
 	<DialogHeader class="border-b p-4">
 		<DialogTitle>Add shift</DialogTitle>
 		<DialogDescription class="sr-only">
-			Create a scheduled shift with location, date, time, break, recurrence, and notes.
+			Create a scheduled shift with team member, date, time, break, recurrence, and notes.
 		</DialogDescription>
 		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
 	</DialogHeader>
@@ -190,27 +191,27 @@
 	<div class="grid max-h-[calc(100dvh-12rem)] gap-5 overflow-y-auto p-4 lg:grid-cols-[1fr_18rem]">
 		<div class="grid gap-4 md:grid-cols-2">
 			<label class="space-y-2 md:col-span-2">
-				<span class={labelClass}>Location</span>
+				<span class={labelClass}>Team member</span>
 				<span class="relative block">
-					<MapPin
+					<UserRound
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<select
-						{...addShift.fields.locationId.as('select', defaultLocationId)}
+						{...addShift.fields.teamMemberId.as('select', defaultTeamMemberId)}
 						class={`${fieldClass} pl-9`}
 						required
-						disabled={locations.length === 0}
+						disabled={teamMembers.length === 0}
 					>
-						{#if locations.length === 0}
-							<option value="">No locations available</option>
+						{#if teamMembers.length === 0}
+							<option value="">No team members available</option>
 						{:else}
-							{#each locations as location (location.id)}
-								<option value={location.id.toString()}>{location.name}</option>
+							{#each teamMembers as teamMember (teamMember.id)}
+								<option value={teamMember.id.toString()}>{teamMember.name}</option>
 							{/each}
 						{/if}
 					</select>
 				</span>
-				{#each addShift.fields.locationId.issues() ?? [] as issue (issue.message)}
+				{#each addShift.fields.teamMemberId.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -370,9 +371,9 @@
 				<p class={labelClass}>Preview</p>
 				<div
 					class="rounded-lg border border-l-4 bg-background p-3 shadow-sm"
-					style:border-left-color={selectedLocation?.color}
+					style:border-left-color={selectedTeamMember?.color}
 				>
-					<p class="text-sm font-bold">{selectedLocation?.name ?? 'Location'}</p>
+					<p class="text-sm font-bold">{selectedTeamMember?.name ?? 'Team member'}</p>
 					<p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
 						<Clock3 class="size-3.5" />
 						{formattedTimeRange}
@@ -402,7 +403,7 @@
 
 	<DialogFooter class="mx-0 mb-0 rounded-none border-t px-4 py-4">
 		<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
-		<Button type="submit" disabled={locations.length === 0 || addShift.pending > 0}>
+		<Button type="submit" disabled={teamMembers.length === 0 || addShift.pending > 0}>
 			{addShift.pending > 0 ? 'Adding...' : 'Add shift'}
 		</Button>
 	</DialogFooter>

@@ -1,17 +1,18 @@
 <script lang="ts">
-	import { logoutUser } from '$lib/auth/auth.remote';
+	import { getCurrentUser, logoutUser } from '$lib/auth/auth.remote';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { page } from '$app/state';
-	import { CalendarDays, LogOut, UserRound } from '@lucide/svelte';
+	import { CalendarDays, LogOut, UserRound, UsersRound } from '@lucide/svelte';
 
-	const user = $derived(page.data.user);
+	const user = $derived(await getCurrentUser());
+	const canManageTeamMembers = $derived(Boolean(user?.capabilities.canManageTeamMembers));
 </script>
 
 <header class="border-b">
-	<div class="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-3">
-		<div class="flex items-center gap-2">
+	<div class="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-3">
+		<div class="flex min-w-0 items-center gap-2 justify-self-start">
 			<div class="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
 				<CalendarDays class="size-5" />
 			</div>
@@ -19,7 +20,34 @@
 			<p class="font-heading text-2xl leading-none font-black">ShiftGrid</p>
 		</div>
 
-		<div class="flex items-center gap-2">
+		{#if user}
+			<nav aria-label="Primary navigation" class="hidden items-center gap-1 justify-self-center sm:flex">
+				<Button
+					href="/"
+					variant={page.url.pathname === '/' ? 'secondary' : 'ghost'}
+					size="sm"
+					class="gap-1.5"
+				>
+					<CalendarDays class="size-3.5" />
+					Schedule
+				</Button>
+				{#if canManageTeamMembers}
+					<Button
+						href="/team-members"
+						variant={page.url.pathname === '/team-members' ? 'secondary' : 'ghost'}
+						size="sm"
+						class="gap-1.5"
+					>
+						<UsersRound class="size-3.5" />
+						Team members
+					</Button>
+				{/if}
+			</nav>
+		{:else}
+			<div></div>
+		{/if}
+
+		<div class="flex items-center gap-2 justify-self-end">
 			<ThemeToggle />
 
 			{#if user}

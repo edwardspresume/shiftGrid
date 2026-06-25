@@ -6,7 +6,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { account, user } from '../lib/server/db/auth.schema';
-import { locations } from '../lib/server/db/schema';
+import { teamMembers } from '../lib/server/db/schema';
 
 const E2E_EMAIL = 'e2e@shiftgrid.local';
 const E2E_PASSWORD = 'ShiftGridE2E123!';
@@ -24,6 +24,7 @@ async function ensureE2EUser() {
 			id: crypto.randomUUID(),
 			name: 'ShiftGrid E2E',
 			email: E2E_EMAIL,
+			role: 'scheduler',
 			emailVerified: true,
 			createdAt: now,
 			updatedAt: now
@@ -32,6 +33,7 @@ async function ensureE2EUser() {
 			target: user.email,
 			set: {
 				name: 'ShiftGrid E2E',
+				role: 'scheduler',
 				emailVerified: true,
 				updatedAt: now
 			}
@@ -75,29 +77,24 @@ async function ensureE2EUser() {
 		})
 		.where(and(eq(account.userId, userId), eq(account.providerId, 'credential')));
 
-	const [existingLocation] = await db
-		.select({ id: locations.id })
-		.from(locations)
-		.where(and(eq(locations.userId, userId), eq(locations.name, 'E2E Location')))
-		.limit(1);
-
-	if (existingLocation) {
-		await db
-			.update(locations)
-			.set({
-				color: '#16a34a',
-				updatedAt: now
-			})
-			.where(eq(locations.id, existingLocation.id));
-	} else {
-		await db.insert(locations).values({
-			userId,
-			name: 'E2E Location',
+	await db
+		.insert(teamMembers)
+		.values({
+			name: 'E2E Team Member',
 			color: '#16a34a',
+			createdByUserId: userId,
+			updatedByUserId: userId,
 			createdAt: now,
 			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: teamMembers.name,
+			set: {
+				color: '#16a34a',
+				updatedByUserId: userId,
+				updatedAt: now
+			}
 		});
-	}
 }
 
 async function signIn(page: Page) {
@@ -184,7 +181,7 @@ test('opens the add shift dialog from a day action', async ({ page }) => {
 	const dialog = await openFirstDayAddShiftDialog(page);
 
 	await expect(dialog).toBeVisible();
-	await expect(dialog.getByLabel('Location')).toBeVisible();
+	await expect(dialog.getByLabel('Team member')).toBeVisible();
 	await expect(dialog.getByLabel('Date')).toBeVisible();
 	await expect(dialog.getByLabel('Break')).toHaveValue('0');
 	await expect(dialog.getByLabel('Start time')).toBeVisible();
@@ -192,9 +189,9 @@ test('opens the add shift dialog from a day action', async ({ page }) => {
 	await expect(dialog.getByRole('button', { name: 'Add shift' })).toBeVisible();
 });
 
-test('creates a location and schedules a shift at it', async ({ page }) => {
+test('creates a team member and schedules a shift for them', async ({ page }) => {
 	const shiftDate = getIsolatedFutureSunday();
-	const locationName = `E2E North ${Date.now()}`;
+	const teamMemberName = `E2E Member ${Date.now()}`;
 	const startHour = 11 + Math.floor(Math.random() * 3);
 	const endHour = startHour + 1;
 	const startTime = formatHourInput(startHour);
@@ -203,17 +200,17 @@ test('creates a location and schedules a shift at it', async ({ page }) => {
 	const shiftNotes = `Cover east desk ${Date.now()}`;
 
 	await page.goto(`/?week=${shiftDate}`);
-	await page.getByRole('button', { name: 'Add location' }).click();
+	await page.getByRole('button', { name: 'Add team member' }).click();
 
-	const locationDialog = page.getByRole('dialog', { name: 'Add location' });
-	await expect(locationDialog).toBeVisible();
-	await locationDialog.getByLabel('Name').fill(locationName);
-	await locationDialog.getByRole('button', { name: 'Add location' }).click();
-	await expect(locationDialog).toBeHidden();
+	const teamMemberDialog = page.getByRole('dialog', { name: 'Add team member' });
+	await expect(teamMemberDialog).toBeVisible();
+	await teamMemberDialog.getByLabel('Name').fill(teamMemberName);
+	await teamMemberDialog.getByRole('button', { name: 'Add team member' }).click();
+	await expect(teamMemberDialog).toBeHidden();
 
 	const shiftDialog = await openFirstDayAddShiftDialog(page);
 	await expect(shiftDialog.getByLabel('Date')).toHaveValue(shiftDate);
-	await shiftDialog.getByLabel('Location').selectOption({ label: locationName });
+	await shiftDialog.getByLabel('Team member').selectOption({ label: teamMemberName });
 	await shiftDialog.getByLabel('Start time').fill(startTime);
 	await shiftDialog.getByLabel('End time').fill(endTime);
 	await shiftDialog.getByLabel('Notes').fill(shiftNotes);
@@ -221,7 +218,7 @@ test('creates a location and schedules a shift at it', async ({ page }) => {
 
 	await expect(shiftDialog).toBeHidden();
 	await expect(
-		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(locationName)
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(teamMemberName)
 	).toBeVisible();
 	await expect(
 		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)

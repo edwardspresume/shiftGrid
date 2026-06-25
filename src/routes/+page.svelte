@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AddLocationForm from '$lib/components/AddLocationForm.svelte';
+	import AddTeamMemberForm from '$lib/components/AddTeamMemberForm.svelte';
 	import AddShiftForm from '$lib/components/AddShiftForm.svelte';
 	import DeleteShiftDialog from '$lib/components/DeleteShiftDialog.svelte';
 	import EditShiftForm from '$lib/components/EditShiftForm.svelte';
@@ -8,7 +8,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
-	import { getLocations, getSchedule, type ScheduledShift } from '$lib/schedule/shifts.remote';
+	import { getCurrentUser } from '$lib/auth/auth.remote';
+	import { getSchedule, getTeamMembers, type ScheduledShift } from '$lib/schedule/shifts.remote';
 	import {
 		DEFAULT_WEEK_STARTS_ON,
 		getCurrentWeekStart,
@@ -16,16 +17,19 @@
 		type WeekStartsOn
 	} from '$lib/schedule/week';
 	import { parseDate, type CalendarDate, type DateValue } from '@internationalized/date';
-	import { BriefcaseBusiness, Clock3, MapPin, Plus } from '@lucide/svelte';
+	import { BriefcaseBusiness, Clock3, Plus, UsersRound } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 
 	const weekStartsOn: WeekStartsOn = DEFAULT_WEEK_STARTS_ON;
+	const currentUser = $derived(await getCurrentUser());
 	const schedule = $derived(await getSchedule(page.url.searchParams.get('week')));
-	const locations = $derived(await getLocations());
+	const teamMembers = $derived(await getTeamMembers());
 	const weekStart: CalendarDate = $derived(parseDate(schedule.weekStart));
-	let isAddLocationFormOpen = $state(false);
+	const canManageTeamMembers = $derived(Boolean(currentUser?.capabilities.canManageTeamMembers));
+	const canManageShifts = $derived(Boolean(currentUser?.capabilities.canManageShifts));
+	let isAddTeamMemberFormOpen = $state(false);
 	let isAddShiftFormOpen = $state(false);
 	let isEditShiftFormOpen = $state(false);
 	let isDeleteShiftDialogOpen = $state(false);
@@ -45,9 +49,9 @@
 			icon: BriefcaseBusiness
 		},
 		{
-			label: 'Locations',
-			value: locations.length.toString(),
-			icon: MapPin
+			label: 'Team members',
+			value: teamMembers.length.toString(),
+			icon: UsersRound
 		}
 	]);
 
@@ -79,12 +83,12 @@
 		isAddShiftFormOpen = true;
 	}
 
-	function openAddLocationForm() {
-		isAddLocationFormOpen = true;
+	function openAddTeamMemberForm() {
+		isAddTeamMemberFormOpen = true;
 	}
 
-	function closeAddLocationForm() {
-		isAddLocationFormOpen = false;
+	function closeAddTeamMemberForm() {
+		isAddTeamMemberFormOpen = false;
 	}
 
 	function closeAddShiftForm() {
@@ -146,16 +150,18 @@
 				{/each}
 			</section>
 
-			<Button type="button" class="w-full gap-2 lg:w-auto" onclick={openAddLocationForm}>
-				<Plus class="size-4" />
-				Add location
-			</Button>
+			{#if canManageTeamMembers}
+				<Button type="button" class="w-full gap-2 lg:w-auto" onclick={openAddTeamMemberForm}>
+					<Plus class="size-4" />
+					Add team member
+				</Button>
+			{/if}
 		</div>
 	</header>
 
-	<Dialog bind:open={isAddLocationFormOpen}>
+	<Dialog bind:open={isAddTeamMemberFormOpen}>
 		<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-md">
-			<AddLocationForm onCancel={closeAddLocationForm} />
+			<AddTeamMemberForm onCancel={closeAddTeamMemberForm} />
 		</DialogContent>
 	</Dialog>
 
@@ -164,7 +170,7 @@
 			class="max-h-[min(44rem,calc(100dvh-2rem))] max-w-5xl gap-0 overflow-hidden p-0 sm:max-w-5xl"
 		>
 			<AddShiftForm
-				{locations}
+				{teamMembers}
 				initialDate={selectedShiftDate || weekStart.toString()}
 				visibleWeekStart={weekStart.toString()}
 				currentWeekQuery={page.url.searchParams.get('week')}
@@ -179,7 +185,7 @@
 		>
 			{#if selectedShift}
 				<EditShiftForm
-					{locations}
+					{teamMembers}
 					shift={selectedShift}
 					visibleWeekStart={weekStart.toString()}
 					currentWeekQuery={page.url.searchParams.get('week')}
@@ -204,6 +210,7 @@
 	<ShiftWeekGrid
 		{weekStart}
 		shifts={schedule.shifts}
+		{canManageShifts}
 		onAddShift={openAddShiftForm}
 		onEditShift={openEditShiftForm}
 		onDeleteShift={openDeleteShiftDialog}

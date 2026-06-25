@@ -13,7 +13,7 @@ import {
 } from './time';
 
 const validShift = {
-	locationId: '1',
+	teamMemberId: '1',
 	shiftDate: '2026-06-24',
 	startTime: '09:00',
 	endTime: '17:00',
@@ -31,7 +31,7 @@ describe('addShiftSchema', () => {
 		if (!result.success) return;
 
 		expect(result.output).toMatchObject({
-			locationId: 1,
+			teamMemberId: 1,
 			breakMinutes: 0,
 			recurrenceFrequency: 'none',
 			recurrenceUntil: null,
@@ -153,6 +153,8 @@ describe('addShiftSchema', () => {
 		const result = v.safeParse(editShiftSchema, {
 			...validShift,
 			id: '42',
+			occurrenceDate: '2026-06-24',
+			scope: 'series',
 			recurrenceFrequency: 'biweekly',
 			recurrenceUntil: '2026-08-24',
 			recurrenceDays: ['1', '3']

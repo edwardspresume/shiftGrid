@@ -1,5 +1,6 @@
-import { form, getRequestEvent } from '$app/server';
+import { form, getRequestEvent, query } from '$app/server';
 import { auth } from '$lib/server/auth';
+import { getRoleCapabilities, getUserRole } from '$lib/server/roles';
 import { redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
 import * as v from 'valibot';
@@ -10,6 +11,24 @@ const loginSchema = v.object({
 });
 
 const logoutSchema = v.object({});
+
+export const getCurrentUser = query(async () => {
+	const { locals } = getRequestEvent();
+
+	if (!locals.user) {
+		return null;
+	}
+
+	const role = await getUserRole(locals.user.id);
+
+	return {
+		id: locals.user.id,
+		name: locals.user.name,
+		email: locals.user.email,
+		role,
+		capabilities: getRoleCapabilities(role)
+	};
+});
 
 export const loginUser = form(loginSchema, async ({ email, _password }) => {
 	const event = getRequestEvent();

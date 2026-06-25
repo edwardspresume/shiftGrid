@@ -23,12 +23,14 @@
 	let {
 		weekStart,
 		shifts,
+		canManageShifts,
 		onAddShift,
 		onEditShift,
 		onDeleteShift
 	}: {
 		weekStart: CalendarDate;
 		shifts: ScheduledShift[];
+		canManageShifts: boolean;
 		onAddShift: (shiftDate: string) => void;
 		onEditShift: (shift: ScheduledShift) => void;
 		onDeleteShift: (shift: ScheduledShift) => void;
@@ -62,15 +64,17 @@
 						</p>
 					</div>
 
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						class="shrink-0"
-						aria-label="Add shift for {day.label}"
-						onclick={() => onAddShift(day.id)}
-					>
-						<Plus class="size-4" />
-					</Button>
+					{#if canManageShifts}
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							class="shrink-0"
+							aria-label="Add shift for {day.label}"
+							onclick={() => onAddShift(day.id)}
+						>
+							<Plus class="size-4" />
+						</Button>
+					{/if}
 				</div>
 			</header>
 
@@ -85,12 +89,12 @@
 					{#each day.shifts as shift (shift.id)}
 						<article
 							class="rounded-lg border border-l-4 bg-background p-3 shadow-sm transition-colors duration-200 hover:bg-muted/35"
-							style:border-left-color={shift.locationColor}
+							style:border-left-color={shift.teamMemberColor}
 						>
 							<header class="flex items-start justify-between gap-2">
 								<div class="min-w-0 space-y-1.5">
 									<h3 class="truncate text-sm font-bold">
-										{shift.location}
+										{shift.teamMember}
 									</h3>
 									<p
 										class="flex items-center gap-1.5 text-[0.7rem] font-semibold text-muted-foreground uppercase"
@@ -100,32 +104,37 @@
 									</p>
 								</div>
 
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger>
-										{#snippet child({ props })}
-											<Button
-												{...props}
-												variant="ghost"
-												size="icon-xs"
-												class="-mt-1 shrink-0"
-												aria-label="Shift actions for {shift.location} {shift.time}"
+								{#if canManageShifts}
+									<DropdownMenu.Root>
+										<DropdownMenu.Trigger>
+											{#snippet child({ props })}
+												<Button
+													{...props}
+													variant="ghost"
+													size="icon-xs"
+													class="-mt-1 shrink-0"
+													aria-label="Shift actions for {shift.teamMember} {shift.time}"
+												>
+													<MoreVertical class="size-4" />
+												</Button>
+											{/snippet}
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content align="end">
+											<DropdownMenu.Item onSelect={() => onEditShift(shift)}>
+												<Pencil class="size-4" />
+												Edit
+											</DropdownMenu.Item>
+											<DropdownMenu.Separator />
+											<DropdownMenu.Item
+												onSelect={() => onDeleteShift(shift)}
+												variant="destructive"
 											>
-												<MoreVertical class="size-4" />
-											</Button>
-										{/snippet}
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Content align="end">
-										<DropdownMenu.Item onSelect={() => onEditShift(shift)}>
-											<Pencil class="size-4" />
-											Edit
-										</DropdownMenu.Item>
-										<DropdownMenu.Separator />
-										<DropdownMenu.Item onSelect={() => onDeleteShift(shift)} variant="destructive">
-											<Trash2 class="size-4" />
-											Delete
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Root>
+												<Trash2 class="size-4" />
+												Delete
+											</DropdownMenu.Item>
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
+								{/if}
 							</header>
 
 							<div class="mt-3 border-t pt-3">

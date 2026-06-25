@@ -44,9 +44,9 @@
 	<div class="space-y-4 p-4">
 		<div
 			class="rounded-lg border border-l-4 bg-background p-3"
-			style:border-left-color={shift.locationColor}
+			style:border-left-color={shift.teamMemberColor}
 		>
-			<p class="text-sm font-bold">{shift.location}</p>
+			<p class="text-sm font-bold">{shift.teamMember}</p>
 			<p class="mt-1 text-sm font-medium text-muted-foreground">{shift.time}</p>
 			<p
 				class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase"
