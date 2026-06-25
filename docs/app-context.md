@@ -15,11 +15,13 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - User roles are `system_admin`, `scheduler`, and `receptionist`.
 - `system_admin` and `scheduler` users can create team members and create/edit/delete shifts. `receptionist` users can view the schedule.
 - Weekly schedule grid with one column per day.
+- On smaller viewports the weekly grid keeps readable day-column widths inside horizontal scrolling instead of compressing all seven columns.
 - Week navigation for previous week, next week, current week, and date-based week selection.
+- Mobile users can reach schedule and team-member navigation from the account menu.
 - Per-day add-shift buttons that open a modal form anchored to that week/day.
 - Schedulers create and manage shared team members from the `/team-members` page.
 - The team members page supports create, edit, and delete for unassigned team members.
-- Team members assigned to existing shift rows cannot be deleted; edit their name/color or remove their shifts first.
+- Team members assigned to existing shift rows cannot be deleted; the delete dialog disables the destructive action and directs schedulers to edit the name/color or remove shifts first.
 - Shift form fields for team member, date, start time, end time, recurrence, repeat-until, selected days, and shift notes.
 - Recurring shift forms include repeat-until presets for 2 weeks, 1 month, and 3 months while keeping the exact date input editable.
 - Shift cards show team member, recurrence label, time range, total hours, and notes when present.
@@ -84,6 +86,8 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - `src/lib/components/ShiftWeekGrid.svelte`: weekly grid, day columns, shift cards, and day-level add actions.
 - `src/lib/components/AddShiftForm.svelte`: add-shift remote form UI, field defaults, recurrence controls, and scoped post-submit refresh.
 - `src/lib/components/EditShiftForm.svelte`: edit-shift remote form UI for updating standalone shifts, updating recurring series, or individualizing a recurring occurrence.
+- `src/lib/components/ShiftFormPreview.svelte`: shared shift form preview card for add/edit dialogs.
+- `src/lib/schedule/shiftFormHelpers.ts`: shared repeat-until preset and weekday helpers used by add/edit shift forms.
 - `src/lib/schedule/shifts.remote.ts`: schedule queries, recurrence expansion, overlap validation, and shift mutations.
 - `src/lib/schedule/shiftValidation.ts`: Valibot schema for add-shift form validation.
 - `src/lib/schedule/time.ts`: clock parsing, display formatting, hours calculation, and overlap math.

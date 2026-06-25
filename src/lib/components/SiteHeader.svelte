@@ -3,6 +3,7 @@
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { CalendarDays, LogOut, UserRound, UsersRound } from '@lucide/svelte';
 
@@ -21,7 +22,10 @@
 		</div>
 
 		{#if user}
-			<nav aria-label="Primary navigation" class="hidden items-center gap-1 justify-self-center sm:flex">
+			<nav
+				aria-label="Primary navigation"
+				class="hidden items-center gap-1 justify-self-center sm:flex"
+			>
 				<Button
 					href="/"
 					variant={page.url.pathname === '/' ? 'secondary' : 'ghost'}
@@ -59,6 +63,22 @@
 					</DropdownMenu.Trigger>
 
 					<DropdownMenu.Content align="end" sideOffset={6} class="w-56">
+						<DropdownMenu.Item class="sm:hidden">
+							<a href={resolve('/')} class="flex w-full items-center gap-2">
+								<CalendarDays class="size-4" />
+								Schedule
+							</a>
+						</DropdownMenu.Item>
+						{#if canManageTeamMembers}
+							<DropdownMenu.Item class="sm:hidden">
+								<a href={resolve('/team-members')} class="flex w-full items-center gap-2">
+									<UsersRound class="size-4" />
+									Team members
+								</a>
+							</DropdownMenu.Item>
+						{/if}
+						<DropdownMenu.Separator class="sm:hidden" />
+
 						<div class="px-2 py-1.5">
 							<p class="truncate text-sm font-medium">{user.name}</p>
 							<p class="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>

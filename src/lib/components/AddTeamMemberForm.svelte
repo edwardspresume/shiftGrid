@@ -38,7 +38,6 @@
 		name: teamMember?.name ?? '',
 		color: getTeamMemberColor(teamMember?.color)
 	});
-	let selectedColor = $state<TeamMemberColor>(teamMemberColorValues[0]);
 
 	const fieldClass =
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground disabled:opacity-70';
@@ -49,13 +48,11 @@
 		if (initializedFor === formKey) return;
 
 		initializedFor = formKey;
-		selectedColor = formValues.color;
 		saveTeamMember.fields.set(formValues);
 	});
 
 	function resetForm(element: HTMLFormElement) {
 		element.reset();
-		selectedColor = formValues.color;
 		saveTeamMember.fields.set(formValues);
 	}
 </script>
@@ -108,11 +105,7 @@
 						class="grid size-10 place-items-center rounded-lg border bg-background transition-colors has-checked:border-primary has-checked:ring-2 has-checked:ring-primary/35"
 						aria-label="Team member color {color}"
 					>
-						<input
-							{...saveTeamMember.fields.color.as('radio', color)}
-							class="sr-only"
-							bind:group={selectedColor}
-						/>
+						<input {...saveTeamMember.fields.color.as('radio', color)} class="sr-only" />
 						<span class="size-6 rounded-full border shadow-sm" style:background-color={color}
 						></span>
 					</label>

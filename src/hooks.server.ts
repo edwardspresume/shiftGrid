@@ -4,7 +4,7 @@ import { redirect } from '@sveltejs/kit';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import type { Handle } from '@sveltejs/kit';
 
-const PUBLIC_ROUTES = new Set(['/login', '/demo/playwright']);
+const PUBLIC_ROUTES = new Set(['/login']);
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	const session = await auth.api.getSession({ headers: event.request.headers });

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import ShiftFormPreview from '$lib/components/ShiftFormPreview.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		DialogDescription,
@@ -18,6 +19,12 @@
 	} from '$lib/schedule/constants';
 	import { parseCanonicalDate } from '$lib/schedule/date';
 	import {
+		getPresetRepeatUntil,
+		getRecurrenceDayValue,
+		repeatUntilPresets,
+		type RepeatUntilPreset
+	} from '$lib/schedule/shiftFormHelpers';
+	import {
 		editShift,
 		getSchedule,
 		type TeamMemberOption,
@@ -28,10 +35,6 @@
 	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound } from '@lucide/svelte';
 
 	type EditScope = 'single' | 'series';
-	type RepeatUntilPreset = {
-		label: string;
-		duration: { days?: number; months?: number };
-	};
 
 	let {
 		teamMembers,
@@ -54,11 +57,6 @@
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground disabled:opacity-70';
 	const labelClass = 'text-xs font-semibold text-muted-foreground uppercase';
 	const issueClass = 'text-xs font-medium text-destructive';
-	const repeatUntilPresets: RepeatUntilPreset[] = [
-		{ label: '2 weeks', duration: { days: 14 } },
-		{ label: '1 month', duration: { months: 1 } },
-		{ label: '3 months', duration: { months: 3 } }
-	];
 	const defaultTeamMemberId = $derived(shift.teamMemberId.toString());
 	const defaultFormKey = $derived(`${shift.ruleId}:${shift.baseShiftDate}:${shift.shiftDate}`);
 	const sourceIsRecurring = $derived(shift.recurrenceFrequency !== 'none');
@@ -102,15 +100,6 @@
 		parseCanonicalDate(shiftDate)?.add({ years: RECURRENCE_LIMIT_YEARS }).toString()
 	);
 
-	function getRecurrenceDayValue(dateValue: string) {
-		const date = parseCanonicalDate(dateValue);
-		if (!date) return recurrenceDayValues[0];
-
-		return new Date(Date.UTC(date.year, date.month - 1, date.day))
-			.getUTCDay()
-			.toString() as (typeof recurrenceDayValues)[number];
-	}
-
 	function getRecurrenceDayValues(value: ScheduledShift) {
 		if (value.recurrenceDays && value.recurrenceDays.length > 0) {
 			return value.recurrenceDays.map(
@@ -150,16 +139,6 @@
 		editShift.fields.set(getDefaultFormValues(scope));
 	}
 
-	function getPresetRepeatUntil(preset: RepeatUntilPreset) {
-		const date = parseCanonicalDate(shiftDate);
-		if (!date) return '';
-
-		const presetDate = date.add(preset.duration);
-		const maxDate = repeatUntilMax ? parseCanonicalDate(repeatUntilMax) : null;
-
-		return maxDate && presetDate.compare(maxDate) > 0 ? maxDate.toString() : presetDate.toString();
-	}
-
 	function getCurrentRecurrenceDays() {
 		const currentDays = editShift.fields.recurrenceDays.value();
 
@@ -169,7 +148,7 @@
 	}
 
 	function applyRepeatUntilPreset(preset: RepeatUntilPreset) {
-		const presetDate = getPresetRepeatUntil(preset);
+		const presetDate = getPresetRepeatUntil(shiftDate, repeatUntilMax, preset);
 		if (!presetDate) return;
 
 		editShift.fields.set({
@@ -399,7 +378,7 @@
 					</label>
 					<div class="grid grid-cols-3 gap-1.5 sm:w-60">
 						{#each repeatUntilPresets as preset (preset.label)}
-							{@const presetValue = getPresetRepeatUntil(preset)}
+							{@const presetValue = getPresetRepeatUntil(shiftDate, repeatUntilMax, preset)}
 							<button
 								type="button"
 								class={[
@@ -445,20 +424,13 @@
 		</div>
 
 		<aside class="space-y-4 rounded-lg border bg-muted/20 p-4">
-			<div class="space-y-2">
-				<p class={labelClass}>Preview</p>
-				<div
-					class="rounded-lg border border-l-4 bg-background p-3 shadow-sm"
-					style:border-left-color={selectedTeamMember?.color}
-				>
-					<p class="text-sm font-bold">{selectedTeamMember?.name ?? 'Team member'}</p>
-					<p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-						<Clock3 class="size-3.5" />
-						{formattedTimeRange}
-					</p>
-					<p class="mt-1 text-xs font-medium text-muted-foreground">{formattedHours} total</p>
-				</div>
-			</div>
+			<ShiftFormPreview
+				{labelClass}
+				teamMemberColor={selectedTeamMember?.color}
+				teamMemberName={selectedTeamMember?.name}
+				{formattedTimeRange}
+				{formattedHours}
+			/>
 
 			<label class="block space-y-2">
 				<span class={labelClass}>Notes</span>

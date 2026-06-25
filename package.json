@@ -13,7 +13,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
-		"test": "pnpm test:unit -- --run && pnpm test:e2e",
+		"test": "pnpm test:unit --run && pnpm test:e2e",
 		"playwright:install": "playwright install",
 		"test:e2e": "DOTENV_CONFIG_PATH=.env.test NODE_OPTIONS=--import=dotenv/config TMPDIR=/tmp playwright test",
 		"test:e2e:debug": "DOTENV_CONFIG_PATH=.env.test NODE_OPTIONS=--import=dotenv/config TMPDIR=/tmp playwright test --debug",

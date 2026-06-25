@@ -3,13 +3,14 @@ import 'dotenv/config';
 import { neon } from '@neondatabase/serverless';
 import { expect, test, type Page } from '@playwright/test';
 import { hashPassword } from 'better-auth/crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { account, user } from '../lib/server/db/auth.schema';
-import { teamMembers } from '../lib/server/db/schema';
+import { shifts, teamMembers } from '../lib/server/db/schema';
 
 const E2E_EMAIL = 'e2e@shiftgrid.local';
 const E2E_PASSWORD = 'ShiftGridE2E123!';
+const createdTeamMemberNames = new Set<string>();
 
 test.describe.configure({ mode: 'serial' });
 
@@ -99,6 +100,45 @@ async function ensureE2EUser() {
 		});
 }
 
+function trackTeamMemberName(name: string) {
+	createdTeamMemberNames.add(name);
+	return name;
+}
+
+async function cleanupE2EData() {
+	if (!process.env.DATABASE_URL) {
+		return;
+	}
+
+	const db = drizzle(neon(process.env.DATABASE_URL));
+	const [e2eUser] = await db
+		.select({ id: user.id })
+		.from(user)
+		.where(eq(user.email, E2E_EMAIL))
+		.limit(1);
+
+	if (e2eUser) {
+		await db.delete(shifts).where(eq(shifts.createdByUserId, e2eUser.id));
+	}
+
+	if (createdTeamMemberNames.size === 0) {
+		return;
+	}
+
+	const rows = await db
+		.select({ id: teamMembers.id })
+		.from(teamMembers)
+		.where(inArray(teamMembers.name, [...createdTeamMemberNames]));
+	const teamMemberIds = rows.map((row) => row.id);
+
+	if (teamMemberIds.length === 0) {
+		return;
+	}
+
+	await db.delete(shifts).where(inArray(shifts.teamMemberId, teamMemberIds));
+	await db.delete(teamMembers).where(inArray(teamMembers.id, teamMemberIds));
+}
+
 async function signIn(page: Page) {
 	await page.goto('/login');
 	await page.getByLabel('Email').fill(E2E_EMAIL);
@@ -109,6 +149,10 @@ async function signIn(page: Page) {
 
 test.beforeAll(async () => {
 	await ensureE2EUser();
+});
+
+test.afterAll(async () => {
+	await cleanupE2EData();
 });
 
 test.beforeEach(async ({ page }) => {
@@ -186,6 +230,7 @@ async function openTeamMemberActions(page: Page, teamMemberName: string) {
 }
 
 async function createTeamMember(page: Page, teamMemberName: string) {
+	trackTeamMemberName(teamMemberName);
 	await page.goto('/team-members');
 	await page.getByRole('button', { name: 'Add team member' }).click();
 
@@ -308,9 +353,9 @@ test('creates standalone shifts for selected non-recurring weekdays', async ({ p
 
 test('edits team members and blocks deleting assigned team members', async ({ page }) => {
 	const suffix = Date.now().toString();
-	const removableName = `E2E Remove ${suffix}`;
-	const updatedName = `E2E Removed ${suffix}`;
-	const assignedName = `E2E Assigned ${suffix}`;
+	const removableName = trackTeamMemberName(`E2E Remove ${suffix}`);
+	const updatedName = trackTeamMemberName(`E2E Removed ${suffix}`);
+	const assignedName = trackTeamMemberName(`E2E Assigned ${suffix}`);
 	const shiftDate = getIsolatedFutureSunday();
 	const startHour = 14 + Math.floor(Math.random() * 3);
 	const endHour = startHour + 1;
@@ -374,8 +419,7 @@ test('edits team members and blocks deleting assigned team members', async ({ pa
 	await expect(
 		deleteDialog.getByText(/cannot be deleted while shifts still reference/)
 	).toBeVisible();
-	await deleteDialog.getByRole('button', { name: 'Delete team member' }).click();
-	await expect(deleteDialog.getByText(/assigned to existing shifts/)).toBeVisible();
+	await expect(deleteDialog.getByRole('button', { name: 'Delete team member' })).toBeDisabled();
 	await expect(
 		page.getByRole('region', { name: 'Team member list' }).getByText(assignedName)
 	).toBeVisible();
@@ -597,7 +641,7 @@ test('edits one recurring occurrence as a standalone shift', async ({ page }) =>
 	const editedNotes = `Standalone occurrence ${Date.now()}`;
 
 	await page.goto(`/?week=${shiftDate}`);
-	let dialog = await openFirstDayAddShiftDialog(page);
+	const dialog = await openFirstDayAddShiftDialog(page);
 
 	await expect(dialog.getByLabel('Date')).toHaveValue(shiftDate);
 	await dialog.getByLabel('Start time').fill(startTime);

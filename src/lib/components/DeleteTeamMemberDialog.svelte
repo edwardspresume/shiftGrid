@@ -74,7 +74,11 @@
 
 	<DialogFooter class="mx-0 mb-0 rounded-none border-t px-4 py-4">
 		<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
-		<Button type="submit" variant="destructive" disabled={deleteTeamMember.pending > 0}>
+		<Button
+			type="submit"
+			variant="destructive"
+			disabled={hasAssignedShifts || deleteTeamMember.pending > 0}
+		>
 			<Trash2 class="size-4" />
 			{deleteTeamMember.pending > 0 ? 'Deleting...' : 'Delete team member'}
 		</Button>
