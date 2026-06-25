@@ -8,11 +8,12 @@ import {
 } from '$lib/schedule/constants';
 import { parseCanonicalDate } from '$lib/schedule/date';
 import {
-	addTeamMemberSchema,
 	addShiftSchema,
+	deleteTeamMemberSchema,
 	deleteShiftSchema,
 	editShiftSchema,
-	scheduleWeekSchema
+	scheduleWeekSchema,
+	saveTeamMemberSchema
 } from '$lib/schedule/shiftValidation';
 import {
 	formatClockTime,
@@ -25,7 +26,7 @@ import {
 import { DEFAULT_WEEK_STARTS_ON, getCurrentWeekStart, getWeekStart } from '$lib/schedule/week';
 import { error, invalid } from '@sveltejs/kit';
 import { form, getRequestEvent, query, requested } from '$app/server';
-import { and, asc, eq, gte, inArray, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import type { CalendarDate } from '@internationalized/date';
 
 type ScheduleDatabase = typeof db;
@@ -108,6 +109,19 @@ function getDayOfWeek(date: CalendarDate) {
 	return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
 }
 
+function getSelectedOneTimeShiftDates(shiftDate: CalendarDate, recurrenceDays: number[] | null) {
+	const selectedDays =
+		recurrenceDays && recurrenceDays.length > 0
+			? [...new Set(recurrenceDays)]
+			: [getDayOfWeek(shiftDate)];
+	const weekStart = getWeekStart(shiftDate, DEFAULT_WEEK_STARTS_ON);
+	const weekStartDay = getDayOfWeek(weekStart);
+
+	return selectedDays
+		.map((day) => weekStart.add({ days: (day - weekStartDay + 7) % 7 }))
+		.sort((first, second) => first.compare(second));
+}
+
 function getOccurrenceDatesInRange(
 	shift: ShiftRule,
 	rangeStart: CalendarDate,
@@ -182,9 +196,12 @@ export const getTeamMembers = query(async () => {
 		.select({
 			id: teamMembers.id,
 			name: teamMembers.name,
-			color: teamMembers.color
+			color: teamMembers.color,
+			shiftCount: count(shifts.id)
 		})
 		.from(teamMembers)
+		.leftJoin(shifts, eq(shifts.teamMemberId, teamMembers.id))
+		.groupBy(teamMembers.id)
 		.orderBy(asc(teamMembers.name));
 });
 
@@ -307,14 +324,18 @@ function isUniqueViolation(error: unknown) {
 	return code === '23505' || message.includes('duplicate key value violates unique constraint');
 }
 
-export const addTeamMember = form(addTeamMemberSchema, async (data, issue) => {
+export const saveTeamMember = form(saveTeamMemberSchema, async (data, issue) => {
 	const userId = requireAuthenticatedUserId();
 	await requireTeamMemberManager(userId);
 
 	const [existingTeamMember] = await db
 		.select({ id: teamMembers.id })
 		.from(teamMembers)
-		.where(eq(teamMembers.name, data.name))
+		.where(
+			data.id
+				? and(eq(teamMembers.name, data.name), ne(teamMembers.id, data.id))
+				: eq(teamMembers.name, data.name)
+		)
 		.limit(1);
 
 	if (existingTeamMember) {
@@ -322,18 +343,68 @@ export const addTeamMember = form(addTeamMemberSchema, async (data, issue) => {
 	}
 
 	try {
-		await db.insert(teamMembers).values({
-			name: data.name,
-			color: data.color,
-			createdByUserId: userId,
-			updatedByUserId: userId
-		});
+		if (data.id) {
+			const [updatedTeamMember] = await db
+				.update(teamMembers)
+				.set({
+					name: data.name,
+					color: data.color,
+					updatedByUserId: userId
+				})
+				.where(eq(teamMembers.id, data.id))
+				.returning({ id: teamMembers.id });
+
+			if (!updatedTeamMember) {
+				invalid(issue.id('Choose an existing team member.'));
+			}
+		} else {
+			await db.insert(teamMembers).values({
+				name: data.name,
+				color: data.color,
+				createdByUserId: userId,
+				updatedByUserId: userId
+			});
+		}
 	} catch (error) {
 		if (isUniqueViolation(error)) {
 			invalid(issue.name('This team member already exists.'));
 		}
 
 		throw error;
+	}
+
+	await requested(getTeamMembers, 1).refreshAll();
+
+	return {
+		success: true
+	};
+});
+
+export const deleteTeamMember = form(deleteTeamMemberSchema, async (data, issue) => {
+	const userId = requireAuthenticatedUserId();
+	await requireTeamMemberManager(userId);
+
+	const [assignedShift] = await db
+		.select({ id: shifts.id })
+		.from(shifts)
+		.where(eq(shifts.teamMemberId, data.id))
+		.limit(1);
+
+	if (assignedShift) {
+		invalid(
+			issue.id(
+				'This team member is assigned to existing shifts. Edit their name or color instead, or remove those shifts before deleting them.'
+			)
+		);
+	}
+
+	const [deletedTeamMember] = await db
+		.delete(teamMembers)
+		.where(eq(teamMembers.id, data.id))
+		.returning({ id: teamMembers.id });
+
+	if (!deletedTeamMember) {
+		invalid(issue.id('Choose an existing team member.'));
 	}
 
 	await requested(getTeamMembers, 1).refreshAll();
@@ -502,24 +573,59 @@ export const addShift = form(addShiftSchema, async (data, issue) => {
 	if (!shiftDate) {
 		invalid(issue.shiftDate('Use a valid shift date.'));
 	}
+	const oneTimeShiftDates =
+		data.recurrenceFrequency === 'none'
+			? getSelectedOneTimeShiftDates(shiftDate, data.recurrenceDays)
+			: [];
 
 	await withSharedScheduleLock(async (database) => {
 		await validateTeamMember(database, data.teamMemberId, issue);
-		await validateNoOverlap(database, data, issue);
 
-		await database.insert(shifts).values({
-			teamMemberId: data.teamMemberId,
-			shiftDate: data.shiftDate,
-			startTime: data.startTime,
-			endTime: data.endTime,
-			breakMinutes: data.breakMinutes,
-			recurrenceFrequency: data.recurrenceFrequency,
-			recurrenceUntil: data.recurrenceUntil,
-			recurrenceDays: data.recurrenceDays,
-			notes: data.notes,
-			createdByUserId: userId,
-			updatedByUserId: userId
-		});
+		if (data.recurrenceFrequency === 'none') {
+			for (const oneTimeShiftDate of oneTimeShiftDates) {
+				await validateNoOverlap(
+					database,
+					{
+						...data,
+						shiftDate: oneTimeShiftDate.toString(),
+						recurrenceDays: null
+					},
+					issue
+				);
+			}
+
+			await database.insert(shifts).values(
+				oneTimeShiftDates.map((oneTimeShiftDate) => ({
+					teamMemberId: data.teamMemberId,
+					shiftDate: oneTimeShiftDate.toString(),
+					startTime: data.startTime,
+					endTime: data.endTime,
+					breakMinutes: data.breakMinutes,
+					recurrenceFrequency: 'none' as const,
+					recurrenceUntil: null,
+					recurrenceDays: null,
+					notes: data.notes,
+					createdByUserId: userId,
+					updatedByUserId: userId
+				}))
+			);
+		} else {
+			await validateNoOverlap(database, data, issue);
+
+			await database.insert(shifts).values({
+				teamMemberId: data.teamMemberId,
+				shiftDate: data.shiftDate,
+				startTime: data.startTime,
+				endTime: data.endTime,
+				breakMinutes: data.breakMinutes,
+				recurrenceFrequency: data.recurrenceFrequency,
+				recurrenceUntil: data.recurrenceUntil,
+				recurrenceDays: data.recurrenceDays,
+				notes: data.notes,
+				createdByUserId: userId,
+				updatedByUserId: userId
+			});
+		}
 	});
 
 	const weekStart = getWeekStart(shiftDate, DEFAULT_WEEK_STARTS_ON).toString();

@@ -11,6 +11,8 @@ import { teamMembers } from '../lib/server/db/schema';
 const E2E_EMAIL = 'e2e@shiftgrid.local';
 const E2E_PASSWORD = 'ShiftGridE2E123!';
 
+test.describe.configure({ mode: 'serial' });
+
 async function ensureE2EUser() {
 	if (!process.env.DATABASE_URL) {
 		throw new Error('DATABASE_URL is not set');
@@ -176,6 +178,24 @@ async function openShiftActions(page: Page, shiftLabel: string, index = 0) {
 		.click();
 }
 
+async function openTeamMemberActions(page: Page, teamMemberName: string) {
+	await page
+		.getByRole('region', { name: 'Team member list' })
+		.getByRole('button', { name: `Team member actions for ${teamMemberName}` })
+		.click();
+}
+
+async function createTeamMember(page: Page, teamMemberName: string) {
+	await page.goto('/team-members');
+	await page.getByRole('button', { name: 'Add team member' }).click();
+
+	const teamMemberDialog = page.getByRole('dialog', { name: 'Add team member' });
+	await expect(teamMemberDialog).toBeVisible();
+	await teamMemberDialog.getByLabel('Name').fill(teamMemberName);
+	await teamMemberDialog.getByRole('button', { name: 'Add team member' }).click();
+	await expect(teamMemberDialog).toBeHidden();
+}
+
 test('opens the add shift dialog from a day action', async ({ page }) => {
 	await page.goto('/');
 	const dialog = await openFirstDayAddShiftDialog(page);
@@ -189,6 +209,12 @@ test('opens the add shift dialog from a day action', async ({ page }) => {
 	await expect(dialog.getByRole('button', { name: 'Add shift' })).toBeVisible();
 });
 
+test('does not expose team member creation on the schedule page', async ({ page }) => {
+	await page.goto('/');
+
+	await expect(page.getByRole('button', { name: 'Add team member' })).toHaveCount(0);
+});
+
 test('creates a team member and schedules a shift for them', async ({ page }) => {
 	const shiftDate = getIsolatedFutureSunday();
 	const teamMemberName = `E2E Member ${Date.now()}`;
@@ -199,14 +225,8 @@ test('creates a team member and schedules a shift for them', async ({ page }) =>
 	const shiftLabel = `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`;
 	const shiftNotes = `Cover east desk ${Date.now()}`;
 
+	await createTeamMember(page, teamMemberName);
 	await page.goto(`/?week=${shiftDate}`);
-	await page.getByRole('button', { name: 'Add team member' }).click();
-
-	const teamMemberDialog = page.getByRole('dialog', { name: 'Add team member' });
-	await expect(teamMemberDialog).toBeVisible();
-	await teamMemberDialog.getByLabel('Name').fill(teamMemberName);
-	await teamMemberDialog.getByRole('button', { name: 'Add team member' }).click();
-	await expect(teamMemberDialog).toBeHidden();
 
 	const shiftDialog = await openFirstDayAddShiftDialog(page);
 	await expect(shiftDialog.getByLabel('Date')).toHaveValue(shiftDate);
@@ -225,6 +245,120 @@ test('creates a team member and schedules a shift for them', async ({ page }) =>
 	).toBeVisible();
 	await expect(
 		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftNotes)
+	).toBeVisible();
+});
+
+test('creates standalone shifts for selected non-recurring weekdays', async ({ page }) => {
+	const shiftDate = getIsolatedFutureSunday();
+	const wednesdayDate = addDays(shiftDate, 3);
+	const fridayDate = addDays(shiftDate, 5);
+	const startHour = 7 + Math.floor(Math.random() * 3);
+	const endHour = startHour + 1;
+	const startTime = formatHourInput(startHour);
+	const endTime = formatHourInput(endHour);
+	const shiftLabel = `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`;
+
+	await page.goto(`/?week=${shiftDate}`);
+	const dialog = await openFirstDayAddShiftDialog(page);
+
+	await expect(dialog.getByLabel('Date')).toHaveValue(shiftDate);
+	await expect(dialog.getByLabel('Recurrence')).toHaveValue('none');
+	await expect(dialog.getByText('Shift days')).toBeVisible();
+	await dialog.getByText('Sun', { exact: true }).click();
+	await dialog.getByText('Wed', { exact: true }).click();
+	await dialog.getByText('Fri', { exact: true }).click();
+	await dialog.getByLabel('Start time').fill(startTime);
+	await dialog.getByLabel('End time').fill(endTime);
+	await dialog.getByRole('button', { name: 'Add shift' }).click();
+
+	await expect(dialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(2);
+
+	await page.goto(`/?week=${wednesdayDate}`);
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(2);
+
+	await page.goto(`/?week=${fridayDate}`);
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(2);
+});
+
+test('edits team members and blocks deleting assigned team members', async ({ page }) => {
+	const suffix = Date.now().toString();
+	const removableName = `E2E Remove ${suffix}`;
+	const updatedName = `E2E Removed ${suffix}`;
+	const assignedName = `E2E Assigned ${suffix}`;
+	const shiftDate = getIsolatedFutureSunday();
+	const startHour = 14 + Math.floor(Math.random() * 3);
+	const endHour = startHour + 1;
+
+	await page.goto('/team-members');
+	await page.getByRole('button', { name: 'Add team member' }).click();
+
+	let teamMemberDialog = page.getByRole('dialog', { name: 'Add team member' });
+	await expect(teamMemberDialog).toBeVisible();
+	await teamMemberDialog.getByLabel('Name').fill(removableName);
+	await teamMemberDialog.getByRole('button', { name: 'Add team member' }).click();
+	await expect(teamMemberDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Team member list' }).getByText(removableName)
+	).toBeVisible();
+
+	await openTeamMemberActions(page, removableName);
+	await page.getByRole('menuitem', { name: 'Edit' }).click();
+
+	teamMemberDialog = page.getByRole('dialog', { name: 'Edit team member' });
+	await expect(teamMemberDialog).toBeVisible();
+	await teamMemberDialog.getByLabel('Name').fill(updatedName);
+	await teamMemberDialog.getByRole('button', { name: 'Save changes' }).click();
+	await expect(teamMemberDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Team member list' }).getByText(updatedName)
+	).toBeVisible();
+
+	await openTeamMemberActions(page, updatedName);
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+
+	let deleteDialog = page.getByRole('dialog', { name: 'Delete team member' });
+	await expect(deleteDialog).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Delete team member' }).click();
+	await expect(deleteDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Team member list' }).getByText(updatedName)
+	).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Add team member' }).click();
+	teamMemberDialog = page.getByRole('dialog', { name: 'Add team member' });
+	await expect(teamMemberDialog).toBeVisible();
+	await teamMemberDialog.getByLabel('Name').fill(assignedName);
+	await teamMemberDialog.getByRole('button', { name: 'Add team member' }).click();
+	await expect(teamMemberDialog).toBeHidden();
+
+	await page.goto(`/?week=${shiftDate}`);
+	const shiftDialog = await openFirstDayAddShiftDialog(page);
+	await shiftDialog.getByLabel('Team member').selectOption({ label: assignedName });
+	await shiftDialog.getByLabel('Start time').fill(formatHourInput(startHour));
+	await shiftDialog.getByLabel('End time').fill(formatHourInput(endHour));
+	await shiftDialog.getByRole('button', { name: 'Add shift' }).click();
+	await expect(shiftDialog).toBeHidden();
+
+	await page.goto('/team-members');
+	await openTeamMemberActions(page, assignedName);
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+
+	deleteDialog = page.getByRole('dialog', { name: 'Delete team member' });
+	await expect(deleteDialog).toBeVisible();
+	await expect(
+		deleteDialog.getByText(/cannot be deleted while shifts still reference/)
+	).toBeVisible();
+	await deleteDialog.getByRole('button', { name: 'Delete team member' }).click();
+	await expect(deleteDialog.getByText(/assigned to existing shifts/)).toBeVisible();
+	await expect(
+		page.getByRole('region', { name: 'Team member list' }).getByText(assignedName)
 	).toBeVisible();
 });
 

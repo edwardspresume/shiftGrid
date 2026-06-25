@@ -76,6 +76,7 @@
 	);
 	const recurrenceUntil = $derived(String(addShift.fields.recurrenceUntil.value() || ''));
 	const isRecurring = $derived(recurrenceFrequency !== 'none');
+	const daySelectionLabel = $derived(isRecurring ? 'Repeat days' : 'Shift days');
 	const selectedTeamMember = $derived(
 		teamMembers.find((teamMember) => teamMember.id.toString() === activeTeamMemberId) ??
 			teamMembers[0]
@@ -344,17 +345,16 @@
 				{/each}
 			</div>
 
-			<fieldset class={['space-y-2 md:col-span-2', !isRecurring && 'opacity-60']}>
-				<legend class={labelClass}>Repeat days</legend>
+			<fieldset class="space-y-2 md:col-span-2">
+				<legend class={labelClass}>{daySelectionLabel}</legend>
 				<div class="grid grid-cols-7 gap-2">
 					{#each recurrenceDayValues as option (option)}
 						<label
-							class="flex min-h-10 items-center justify-center rounded-lg border bg-background px-2 text-xs font-semibold transition-colors has-checked:border-primary has-checked:bg-primary/10 has-checked:text-primary has-disabled:cursor-not-allowed has-disabled:bg-muted/60 has-disabled:text-muted-foreground"
+							class="flex min-h-10 items-center justify-center rounded-lg border bg-background px-2 text-xs font-semibold transition-colors has-checked:border-primary has-checked:bg-primary/10 has-checked:text-primary"
 						>
 							<input
 								{...addShift.fields.recurrenceDays.as('checkbox', option)}
 								class="sr-only"
-								disabled={!isRecurring}
 							/>
 							{recurrenceDayLabels[option]}
 						</label>

@@ -6,7 +6,7 @@
 
 ShiftGrid currently centers on a shared weekly schedule view. Users choose a week, review scheduled shifts by day, and users with scheduler permissions add shifts from the individual day column where the shift will appear.
 
-The app is operational rather than marketing-focused: the main screen is the working schedule grid, a compact weekly summary, and week navigation.
+The app is operational rather than marketing-focused: the main screen is the working schedule grid and week navigation.
 
 ## Current User Features
 
@@ -16,10 +16,11 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - `system_admin` and `scheduler` users can create team members and create/edit/delete shifts. `receptionist` users can view the schedule.
 - Weekly schedule grid with one column per day.
 - Week navigation for previous week, next week, current week, and date-based week selection.
-- Summary stats for total scheduled hours, shift count, and team member count.
-- Per-day add-shift buttons that open a modal form with the date fixed to that day.
-- Schedulers can create shared team members from the weekly schedule page or the `/team-members` page.
-- Shift form fields for team member, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
+- Per-day add-shift buttons that open a modal form anchored to that week/day.
+- Schedulers create and manage shared team members from the `/team-members` page.
+- The team members page supports create, edit, and delete for unassigned team members.
+- Team members assigned to existing shift rows cannot be deleted; edit their name/color or remove their shifts first.
+- Shift form fields for team member, date, break, start time, end time, recurrence, repeat-until, selected days, and shift notes.
 - Recurring shift forms include repeat-until presets for 2 weeks, 1 month, and 3 months while keeping the exact date input editable.
 - Shift cards show team member, recurrence label, time range, total hours, and notes when present.
 - Shift cards include a three-dot actions menu with edit and delete actions.
@@ -31,6 +32,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Shifts cannot overlap existing coverage for the same team member, including overnight boundaries.
 - Overlap checks compare expanded occurrence ranges for the assigned team member, so one-time shifts cannot collide with that team member's recurring occurrences and recurring shifts cannot collide with that team member's existing one-time or recurring shifts.
 - Recurrence frequencies are currently `none`, `weekly`, and `biweekly`.
+- Non-recurring add-shift submissions can select one or more weekdays in the anchored week; each selected weekday is inserted as a standalone one-time shift row.
 - Weekly and biweekly shifts require a repeat-until date.
 - Weekly and biweekly shifts require at least one selected repeat weekday.
 - Repeat-until cannot be before the shift date and is capped at `RECURRENCE_LIMIT_YEARS`.
@@ -57,10 +59,11 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Current-user role/capability lookup uses `getCurrentUser()` in `src/lib/auth/auth.remote.ts`; it intentionally avoids route `load` data.
 - Schedule queries require an authenticated Better Auth session and read the shared schedule.
 - Schedule mutations require `system_admin` or `scheduler`.
-- `getSchedule(week)` returns only the requested week's expanded shift occurrences and weekly summary.
+- `getSchedule(week)` returns only the requested week's expanded shift occurrences and lightweight summary data for internal use.
 - `getTeamMembers()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static team member data.
-- `addTeamMember` validates a shared team member name/color, requires `system_admin` or `scheduler`, relies on the global unique team-member name constraint to block duplicates, stores audit user ids, and refreshes `getTeamMembers()`.
-- `addShift` validates input, checks team member existence, checks same-team-member overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
+- `saveTeamMember` validates a shared team member name/color, requires `system_admin` or `scheduler`, relies on the global unique team-member name constraint to block duplicates, stores audit user ids, and refreshes `getTeamMembers()`.
+- `deleteTeamMember` requires `system_admin` or `scheduler` and only deletes team members with no assigned shift rows.
+- `addShift` validates input, checks team member existence, checks same-team-member overlap windows, inserts one or more shift rows depending on selected days/recurrence, and accepts one requested `getSchedule` refresh.
 - `editShift` validates the same scheduling rules, updates standalone shifts and recurring series in place, or individualizes one recurring occurrence by cancelling the source occurrence and inserting a non-recurring shift. Series edits clear cancellation exceptions when the recurrence pattern changes and accept one requested `getSchedule` refresh.
 - `deleteShift` deletes one-time shifts directly, deletes recurring series directly, or creates a cancelled occurrence exception for a single recurring shift.
 - Shift add/edit/delete operations run inside a pooled Postgres transaction with a shared schedule advisory transaction lock so overlap validation and writes are serialized for the shared schedule.
@@ -69,7 +72,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 ## Important Source Areas
 
 - `src/routes/+page.svelte`: main schedule page, week state, modal state, and remote query usage.
-- `src/routes/team-members/+page.svelte`: shared team member list and team member creation entry point.
+- `src/routes/team-members/+page.svelte`: shared team member list with create/edit/delete management.
 - `src/routes/login/+page.svelte`: invite-only email/password login form.
 - `src/lib/auth/auth.remote.ts`: login/logout remote forms backed by Better Auth.
 - `scripts/seed-owner.mjs`: environment-driven owner account seeding for invite-only deployments.
@@ -89,7 +92,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 - There is no "this and future shifts" edit/delete behavior yet. That requires splitting a recurring rule at the selected occurrence date.
 - Recurrence supports weekly and biweekly weekday patterns; monthly and end-after-N-occurrences rules do not exist yet.
-- Team member editing/deletion UI is not present yet; current management supports creation and listing.
+- Team member deletion is hard-delete only for unassigned team members. There is no archive/deactivate state yet.
 
 ## Maintenance Notes For Agents
 

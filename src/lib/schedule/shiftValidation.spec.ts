@@ -20,6 +20,7 @@ const validShift = {
 	breakMinutes: '0',
 	recurrenceFrequency: 'none',
 	recurrenceUntil: '',
+	recurrenceDays: ['3'],
 	notes: 'Coverage notes'
 };
 
@@ -35,7 +36,7 @@ describe('addShiftSchema', () => {
 			breakMinutes: 0,
 			recurrenceFrequency: 'none',
 			recurrenceUntil: null,
-			recurrenceDays: null,
+			recurrenceDays: [3],
 			notes: 'Coverage notes'
 		});
 	});
@@ -109,6 +110,15 @@ describe('addShiftSchema', () => {
 		expect(result.success).toBe(false);
 	});
 
+	it('requires at least one shift day for non-recurring shifts', () => {
+		const result = v.safeParse(addShiftSchema, {
+			...validShift,
+			recurrenceDays: []
+		});
+
+		expect(result.success).toBe(false);
+	});
+
 	it('parses selected repeat days for recurring shifts', () => {
 		const result = v.safeParse(addShiftSchema, {
 			...validShift,
@@ -134,7 +144,7 @@ describe('addShiftSchema', () => {
 		expect(result.success).toBe(false);
 	});
 
-	it('ignores stale repeat end dates when recurrence is disabled', () => {
+	it('keeps selected shift days when recurrence is disabled', () => {
 		const result = v.safeParse(addShiftSchema, {
 			...validShift,
 			recurrenceFrequency: 'none',
@@ -146,7 +156,7 @@ describe('addShiftSchema', () => {
 		if (!result.success) return;
 
 		expect(result.output.recurrenceUntil).toBeNull();
-		expect(result.output.recurrenceDays).toBeNull();
+		expect(result.output.recurrenceDays).toEqual([1, 2]);
 	});
 
 	it('parses edit shift submissions with the same shift fields', () => {

@@ -1,16 +1,22 @@
 <script lang="ts">
 	import { getCurrentUser } from '$lib/auth/auth.remote';
 	import AddTeamMemberForm from '$lib/components/AddTeamMemberForm.svelte';
+	import DeleteTeamMemberDialog from '$lib/components/DeleteTeamMemberDialog.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
-	import { getTeamMembers } from '$lib/schedule/shifts.remote';
-	import { Plus, UserRound } from '@lucide/svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { getTeamMembers, type TeamMemberOption } from '$lib/schedule/shifts.remote';
+	import { MoreVertical, Pencil, Plus, Trash2, UserRound } from '@lucide/svelte';
 
 	const currentUser = $derived(await getCurrentUser());
 	const teamMembers = $derived(await getTeamMembers());
 	const canManageTeamMembers = $derived(Boolean(currentUser?.capabilities.canManageTeamMembers));
 	let isAddTeamMemberFormOpen = $state(false);
+	let isEditTeamMemberFormOpen = $state(false);
+	let isDeleteTeamMemberDialogOpen = $state(false);
+	let selectedEditTeamMember = $state<TeamMemberOption | null>(null);
+	let selectedDeleteTeamMember = $state<TeamMemberOption | null>(null);
 
 	function openAddTeamMemberForm() {
 		isAddTeamMemberFormOpen = true;
@@ -18,6 +24,24 @@
 
 	function closeAddTeamMemberForm() {
 		isAddTeamMemberFormOpen = false;
+	}
+
+	function openEditTeamMemberForm(teamMember: TeamMemberOption) {
+		selectedEditTeamMember = teamMember;
+		isEditTeamMemberFormOpen = true;
+	}
+
+	function closeEditTeamMemberForm() {
+		isEditTeamMemberFormOpen = false;
+	}
+
+	function openDeleteTeamMemberDialog(teamMember: TeamMemberOption) {
+		selectedDeleteTeamMember = teamMember;
+		isDeleteTeamMemberDialogOpen = true;
+	}
+
+	function closeDeleteTeamMemberDialog() {
+		isDeleteTeamMemberDialogOpen = false;
 	}
 </script>
 
@@ -48,6 +72,25 @@
 		</DialogContent>
 	</Dialog>
 
+	<Dialog bind:open={isEditTeamMemberFormOpen}>
+		<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-md">
+			{#if selectedEditTeamMember}
+				<AddTeamMemberForm teamMember={selectedEditTeamMember} onCancel={closeEditTeamMemberForm} />
+			{/if}
+		</DialogContent>
+	</Dialog>
+
+	<Dialog bind:open={isDeleteTeamMemberDialogOpen}>
+		<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-lg">
+			{#if selectedDeleteTeamMember}
+				<DeleteTeamMemberDialog
+					teamMember={selectedDeleteTeamMember}
+					onCancel={closeDeleteTeamMemberDialog}
+				/>
+			{/if}
+		</DialogContent>
+	</Dialog>
+
 	<section aria-label="Team member list" class="rounded-lg border bg-card shadow-sm">
 		{#if teamMembers.length === 0}
 			<div class="grid min-h-56 place-items-center px-6 text-center">
@@ -66,15 +109,51 @@
 		{:else}
 			<div class="divide-y">
 				{#each teamMembers as teamMember (teamMember.id)}
-					<article class="flex min-h-16 items-center gap-3 px-4 py-3">
-						<span
-							class="size-4 rounded-full border shadow-sm"
-							style:background-color={teamMember.color}
-						></span>
-						<div class="min-w-0">
-							<p class="truncate text-sm font-bold">{teamMember.name}</p>
-							<p class="mt-1 text-xs font-medium text-muted-foreground">{teamMember.color}</p>
+					<article class="flex min-h-16 items-center justify-between gap-3 px-4 py-3">
+						<div class="flex min-w-0 items-center gap-3">
+							<span
+								class="size-4 shrink-0 rounded-full border shadow-sm"
+								style:background-color={teamMember.color}
+							></span>
+							<div class="min-w-0">
+								<p class="truncate text-sm font-bold">{teamMember.name}</p>
+								<p class="mt-1 text-xs font-medium text-muted-foreground">
+									{teamMember.shiftCount}
+									{teamMember.shiftCount === 1 ? 'shift' : 'shifts'}
+								</p>
+							</div>
 						</div>
+
+						{#if canManageTeamMembers}
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Button
+											{...props}
+											variant="ghost"
+											size="icon-sm"
+											aria-label="Team member actions for {teamMember.name}"
+										>
+											<MoreVertical class="size-4" />
+										</Button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Item onSelect={() => openEditTeamMemberForm(teamMember)}>
+										<Pencil class="size-4" />
+										Edit
+									</DropdownMenu.Item>
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item
+										onSelect={() => openDeleteTeamMemberDialog(teamMember)}
+										variant="destructive"
+									>
+										<Trash2 class="size-4" />
+										Delete
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						{/if}
 					</article>
 				{/each}
 			</div>

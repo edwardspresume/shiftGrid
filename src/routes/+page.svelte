@@ -1,11 +1,9 @@
 <script lang="ts">
-	import AddTeamMemberForm from '$lib/components/AddTeamMemberForm.svelte';
 	import AddShiftForm from '$lib/components/AddShiftForm.svelte';
 	import DeleteShiftDialog from '$lib/components/DeleteShiftDialog.svelte';
 	import EditShiftForm from '$lib/components/EditShiftForm.svelte';
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
 	import { getCurrentUser } from '$lib/auth/auth.remote';
@@ -17,7 +15,6 @@
 		type WeekStartsOn
 	} from '$lib/schedule/week';
 	import { parseDate, type CalendarDate, type DateValue } from '@internationalized/date';
-	import { BriefcaseBusiness, Clock3, Plus, UsersRound } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -27,33 +24,13 @@
 	const schedule = $derived(await getSchedule(page.url.searchParams.get('week')));
 	const teamMembers = $derived(await getTeamMembers());
 	const weekStart: CalendarDate = $derived(parseDate(schedule.weekStart));
-	const canManageTeamMembers = $derived(Boolean(currentUser?.capabilities.canManageTeamMembers));
 	const canManageShifts = $derived(Boolean(currentUser?.capabilities.canManageShifts));
-	let isAddTeamMemberFormOpen = $state(false);
 	let isAddShiftFormOpen = $state(false);
 	let isEditShiftFormOpen = $state(false);
 	let isDeleteShiftDialogOpen = $state(false);
 	let selectedShiftDate = $state('');
 	let selectedShift = $state<ScheduledShift | null>(null);
 	let selectedDeleteShift = $state<ScheduledShift | null>(null);
-
-	const summaryStats = $derived([
-		{
-			label: 'Total hours',
-			value: `${Number.isInteger(schedule.summary.totalHours) ? schedule.summary.totalHours : schedule.summary.totalHours.toFixed(1)}h`,
-			icon: Clock3
-		},
-		{
-			label: 'Scheduled shifts',
-			value: schedule.summary.scheduledShifts.toString(),
-			icon: BriefcaseBusiness
-		},
-		{
-			label: 'Team members',
-			value: teamMembers.length.toString(),
-			icon: UsersRound
-		}
-	]);
 
 	function applyWeekStart(date: CalendarDate) {
 		goto(resolve(`/?week=${date.toString()}`), {
@@ -83,14 +60,6 @@
 		isAddShiftFormOpen = true;
 	}
 
-	function openAddTeamMemberForm() {
-		isAddTeamMemberFormOpen = true;
-	}
-
-	function closeAddTeamMemberForm() {
-		isAddTeamMemberFormOpen = false;
-	}
-
 	function closeAddShiftForm() {
 		isAddShiftFormOpen = false;
 	}
@@ -118,52 +87,21 @@
 
 <main class="mx-auto max-w-[1600px] px-6 py-6">
 	<header class="mb-6 border-b pb-6">
-		<div class="space-y-4">
-			<p class="font-heading text-2xl leading-none font-black tracking-normal">Weekly schedule</p>
+		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+			<div class="space-y-4">
+				<p class="font-heading text-2xl leading-none font-black tracking-normal">Weekly schedule</p>
 
-			<WeekSelector
-				{weekStart}
-				{weekStartsOn}
-				onPreviousWeek={goToPreviousWeek}
-				onNextWeek={goToNextWeek}
-				onThisWeek={goToThisWeek}
-				onApplyDate={applySelectedDate}
-			/>
-		</div>
-
-		<div class="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-			<section aria-label="Weekly summary" class="grid flex-1 grid-cols-3 gap-3">
-				{#each summaryStats as stat (stat.label)}
-					{@const Icon = stat.icon}
-					<div class="flex items-center gap-3 border-l px-4 py-1">
-						<div class="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-							<Icon class="size-4" />
-						</div>
-
-						<div>
-							<p class="text-xs font-semibold text-muted-foreground uppercase">
-								{stat.label}
-							</p>
-							<p class="mt-0.5 font-heading text-2xl leading-none font-black">{stat.value}</p>
-						</div>
-					</div>
-				{/each}
-			</section>
-
-			{#if canManageTeamMembers}
-				<Button type="button" class="w-full gap-2 lg:w-auto" onclick={openAddTeamMemberForm}>
-					<Plus class="size-4" />
-					Add team member
-				</Button>
-			{/if}
+				<WeekSelector
+					{weekStart}
+					{weekStartsOn}
+					onPreviousWeek={goToPreviousWeek}
+					onNextWeek={goToNextWeek}
+					onThisWeek={goToThisWeek}
+					onApplyDate={applySelectedDate}
+				/>
+			</div>
 		</div>
 	</header>
-
-	<Dialog bind:open={isAddTeamMemberFormOpen}>
-		<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-md">
-			<AddTeamMemberForm onCancel={closeAddTeamMemberForm} />
-		</DialogContent>
-	</Dialog>
 
 	<Dialog bind:open={isAddShiftFormOpen}>
 		<DialogContent

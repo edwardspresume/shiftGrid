@@ -22,7 +22,16 @@ export const teamMemberColorValues = [
 	'#475569'
 ] as const;
 
-export const addTeamMemberSchema = v.object({
+export const saveTeamMemberSchema = v.object({
+	id: v.pipe(
+		v.fallback(v.string(), ''),
+		v.trim(),
+		v.transform((value): number | null => (value === '' ? null : Number(value))),
+		v.check(
+			(value) => value === null || (Number.isInteger(value) && value > 0),
+			'Choose an existing team member.'
+		)
+	),
 	name: v.pipe(
 		v.string('Enter a team member name.'),
 		v.trim(),
@@ -30,6 +39,16 @@ export const addTeamMemberSchema = v.object({
 		v.maxLength(80, 'Team member names must be 80 characters or less.')
 	),
 	color: v.picklist(teamMemberColorValues, 'Choose a team member color.')
+});
+
+export const deleteTeamMemberSchema = v.object({
+	id: v.pipe(
+		v.string('Choose a team member.'),
+		v.trim(),
+		v.transform(Number),
+		v.integer('Choose a team member.'),
+		v.minValue(1, 'Choose a team member.')
+	)
 });
 
 const shiftFormFields = {
@@ -119,16 +138,15 @@ export const addShiftSchema = v.pipe(
 	),
 	v.forward(
 		v.check(
-			({ recurrenceFrequency, recurrenceDays }) =>
-				recurrenceFrequency === 'none' || recurrenceDays.length > 0,
-			'Choose at least one repeat day.'
+			({ recurrenceDays }) => recurrenceDays.length > 0,
+			'Choose at least one shift day.'
 		),
 		['recurrenceDays']
 	),
 	v.transform((data) => ({
 		...data,
 		recurrenceUntil: data.recurrenceFrequency === 'none' ? null : data.recurrenceUntil,
-		recurrenceDays: data.recurrenceFrequency === 'none' ? null : data.recurrenceDays
+		recurrenceDays: data.recurrenceDays
 	}))
 );
 
