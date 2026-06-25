@@ -39,6 +39,14 @@ type ShiftRule = {
 	recurrenceDays: number[] | null;
 };
 
+type OverlapValidationOptions = {
+	excludedShiftId?: number;
+	cancelledOccurrence?: {
+		shiftId: number;
+		occurrenceDate: string;
+	};
+};
+
 function requireAuthenticatedUserId() {
 	const { locals } = getRequestEvent();
 
@@ -365,7 +373,7 @@ async function validateNoOverlap(
 		startTime: (message: string) => RemoteIssue;
 		recurrenceUntil: (message: string) => RemoteIssue;
 	},
-	excludedShiftId?: number
+	options: OverlapValidationOptions = {}
 ) {
 	const shiftDate = parseCanonicalDate(data.shiftDate);
 	if (!shiftDate) {
@@ -393,11 +401,11 @@ async function validateNoOverlap(
 		})
 		.from(shifts)
 		.where(
-			excludedShiftId
+			options.excludedShiftId
 				? and(
 						eq(shifts.userId, userId),
 						getShiftDateWindowWhere(overlapWindowStart, overlapWindowEnd),
-						ne(shifts.id, excludedShiftId)
+						ne(shifts.id, options.excludedShiftId)
 					)
 				: and(
 						eq(shifts.userId, userId),
@@ -445,7 +453,11 @@ async function validateNoOverlap(
 			)
 				.filter(
 					(occurrenceDate) =>
-						!cancelledOccurrences.get(existingShift.id)?.has(occurrenceDate.toString())
+						!cancelledOccurrences.get(existingShift.id)?.has(occurrenceDate.toString()) &&
+						!(
+							options.cancelledOccurrence?.shiftId === existingShift.id &&
+							options.cancelledOccurrence.occurrenceDate === occurrenceDate.toString()
+						)
 				)
 				.map((occurrenceDate) => ({ ...existingShift, occurrenceDate }))
 		)
@@ -552,27 +564,74 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 		}
 
 		await validateLocation(database, userId, data.locationId, issue);
-		await validateNoOverlap(database, userId, data, issue, data.id);
 
-		const shouldClearExceptions = hasRecurrencePatternChanged(existingShift, data);
+		if (data.scope === 'single' && existingShift.recurrenceFrequency !== 'none') {
+			const occurrenceDate = parseCanonicalDate(data.occurrenceDate);
+			if (!occurrenceDate) {
+				invalid(issue.occurrenceDate('Use a valid shift date.'));
+			}
 
-		await database
-			.update(shifts)
-			.set({
+			const matchingOccurrence = getOccurrenceDatesInRange(
+				existingShift,
+				occurrenceDate,
+				occurrenceDate
+			).some((date) => date.compare(occurrenceDate) === 0);
+
+			if (!matchingOccurrence) {
+				invalid(issue.occurrenceDate('Choose an existing shift occurrence.'));
+			}
+
+			await validateNoOverlap(database, userId, data, issue, {
+				cancelledOccurrence: {
+					shiftId: data.id,
+					occurrenceDate: data.occurrenceDate
+				}
+			});
+
+			await database
+				.insert(shiftExceptions)
+				.values({
+					shiftId: data.id,
+					occurrenceDate: data.occurrenceDate,
+					action: 'cancelled'
+				})
+				.onConflictDoNothing();
+
+			await database.insert(shifts).values({
+				userId,
 				locationId: data.locationId,
 				shiftDate: data.shiftDate,
 				startTime: data.startTime,
 				endTime: data.endTime,
 				breakMinutes: data.breakMinutes,
-				recurrenceFrequency: data.recurrenceFrequency,
-				recurrenceUntil: data.recurrenceUntil,
-				recurrenceDays: data.recurrenceDays,
+				recurrenceFrequency: 'none',
+				recurrenceUntil: null,
+				recurrenceDays: null,
 				notes: data.notes
-			})
-			.where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)));
+			});
+		} else {
+			await validateNoOverlap(database, userId, data, issue, { excludedShiftId: data.id });
 
-		if (shouldClearExceptions) {
-			await database.delete(shiftExceptions).where(eq(shiftExceptions.shiftId, data.id));
+			const shouldClearExceptions = hasRecurrencePatternChanged(existingShift, data);
+
+			await database
+				.update(shifts)
+				.set({
+					locationId: data.locationId,
+					shiftDate: data.shiftDate,
+					startTime: data.startTime,
+					endTime: data.endTime,
+					breakMinutes: data.breakMinutes,
+					recurrenceFrequency: data.recurrenceFrequency,
+					recurrenceUntil: data.recurrenceUntil,
+					recurrenceDays: data.recurrenceDays,
+					notes: data.notes
+				})
+				.where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)));
+
+			if (shouldClearExceptions) {
+				await database.delete(shiftExceptions).where(eq(shiftExceptions.shiftId, data.id));
+			}
 		}
 	});
 

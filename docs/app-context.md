@@ -18,7 +18,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Per-day add-shift buttons that open a modal form with the date fixed to that day.
 - Users can create owned locations from the weekly schedule page.
 - Shift form fields for location, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
-- Shift cards show location, recurrence label, time range, and total hours.
+- Shift cards show location, recurrence label, time range, total hours, and notes when present.
 - Shift cards include a three-dot actions menu with edit and delete actions.
 - Overnight shifts are supported by treating an end time earlier than or equal to the start time as next-day coverage.
 - Light and dark theme support through the existing theme toggle.
@@ -32,7 +32,9 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Weekly and biweekly shifts require at least one selected repeat weekday.
 - Repeat-until cannot be before the shift date and is capped at `RECURRENCE_LIMIT_YEARS`.
 - Recurring shifts are stored as one database row representing the rule, then expanded into visible occurrences for the requested week.
-- Editing a recurring shift currently edits the whole stored rule. If the recurrence pattern changes, existing per-date cancellation exceptions are cleared because they no longer describe the same set of occurrences.
+- Editing a recurring shift can apply changes to the selected occurrence or the whole stored rule.
+- Editing one recurring occurrence creates a cancellation exception for the original occurrence and inserts the edited entry as a standalone non-recurring shift.
+- Editing a recurring series updates the stored rule. If the recurrence pattern changes, existing per-date cancellation exceptions are cleared because they no longer describe the same set of occurrences.
 - Deleting a single recurring shift creates a cancellation exception for that occurrence date. Deleting a series deletes the stored rule and cascades its exceptions.
 - Bulk recurring creation is all-or-nothing: any overlap blocks the new recurring rule rather than silently skipping dates.
 
@@ -54,7 +56,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - `getLocations()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static location data.
 - `addLocation` validates a user-owned location name/color, relies on the per-user unique location-name constraint to block duplicates, inserts with `locals.user.id`, and refreshes `getLocations()`.
 - `addShift` validates input, checks location existence, checks overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
-- `editShift` validates the same scheduling rules, excludes the edited rule during overlap checks, updates the stored rule, clears cancellation exceptions when the recurrence pattern changes, and accepts one requested `getSchedule` refresh.
+- `editShift` validates the same scheduling rules, updates standalone shifts and recurring series in place, or individualizes one recurring occurrence by cancelling the source occurrence and inserting a non-recurring shift. Series edits clear cancellation exceptions when the recurrence pattern changes and accept one requested `getSchedule` refresh.
 - `deleteShift` deletes one-time shifts directly, deletes recurring series directly, or creates a cancelled occurrence exception for a single recurring shift.
 - Shift add/edit/delete operations run inside a pooled Postgres transaction with a per-user advisory transaction lock so overlap validation and writes are serialized for each user.
 - Shift forms submit with `form.submit().updates(getSchedule(currentWeekQuery))`, keeping refresh scoped to the visible schedule query and avoiding a full app invalidation.
@@ -68,7 +70,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - `src/lib/components/AddLocationForm.svelte`: add-location remote form UI.
 - `src/lib/components/ShiftWeekGrid.svelte`: weekly grid, day columns, shift cards, and day-level add actions.
 - `src/lib/components/AddShiftForm.svelte`: add-shift remote form UI, field defaults, recurrence controls, and scoped post-submit refresh.
-- `src/lib/components/EditShiftForm.svelte`: edit-shift remote form UI for updating stored shift rules.
+- `src/lib/components/EditShiftForm.svelte`: edit-shift remote form UI for updating standalone shifts, updating recurring series, or individualizing a recurring occurrence.
 - `src/lib/schedule/shifts.remote.ts`: schedule queries, recurrence expansion, overlap validation, and shift mutations.
 - `src/lib/schedule/shiftValidation.ts`: Valibot schema for add-shift form validation.
 - `src/lib/schedule/time.ts`: clock parsing, display formatting, hours calculation, and overlap math.
@@ -78,7 +80,6 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 ## Known Product Gaps
 
-- There is no single-occurrence edit flow yet. Add modified exception rows before supporting "Edit this shift" for one item in a recurring series.
 - There is no "this and future shifts" edit/delete behavior yet. That requires splitting a recurring rule at the selected occurrence date.
 - Recurrence supports weekly and biweekly weekday patterns; monthly and end-after-N-occurrences rules do not exist yet.
 - Location editing/deletion UI is not present in the main scheduling workflow.

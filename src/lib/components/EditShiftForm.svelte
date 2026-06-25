@@ -14,8 +14,9 @@
 		RECURRENCE_LIMIT_YEARS,
 		recurrenceDayLabels,
 		recurrenceDayValues,
+		type RecurrenceFrequency,
 		recurrenceFrequencyLabels,
-		recurrenceFrequencyValues
+		recurrenceFrequencyValues as recurrenceFrequencyOptions
 	} from '$lib/schedule/constants';
 	import { parseCanonicalDate } from '$lib/schedule/date';
 	import {
@@ -27,6 +28,8 @@
 	import { formatClockTime, formatCompactHours, getShiftHours } from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
+
+	type EditScope = 'single' | 'series';
 
 	let {
 		locations,
@@ -43,6 +46,7 @@
 	} = $props();
 
 	let initializedFor = '';
+	let editScope = $state<EditScope>('series');
 
 	const fieldClass =
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground disabled:opacity-70';
@@ -50,8 +54,15 @@
 	const issueClass = 'text-xs font-medium text-destructive';
 	const defaultLocationId = $derived(shift.locationId.toString());
 	const defaultFormKey = $derived(`${shift.ruleId}:${shift.baseShiftDate}:${shift.shiftDate}`);
+	const sourceIsRecurring = $derived(shift.recurrenceFrequency !== 'none');
 	const activeLocationId = $derived(
 		String(editShift.fields.locationId.value() || defaultLocationId)
+	);
+	const shiftDate = $derived(
+		String(
+			editShift.fields.shiftDate.value() ||
+				(editScope === 'single' ? shift.shiftDate : shift.baseShiftDate)
+		)
 	);
 	const startTime = $derived(String(editShift.fields.startTime.value() || shift.startTime));
 	const endTime = $derived(String(editShift.fields.endTime.value() || shift.endTime));
@@ -67,24 +78,14 @@
 			locations.find((location) => location.id === shift.locationId) ??
 			locations[0]
 	);
-	const defaultFormValues = $derived({
-		id: shift.ruleId.toString(),
-		locationId: shift.locationId.toString(),
-		shiftDate: shift.baseShiftDate,
-		startTime: shift.startTime,
-		endTime: shift.endTime,
-		breakMinutes: shift.breakMinutes.toString() as (typeof breakMinuteOptions)[number],
-		recurrenceFrequency: shift.recurrenceFrequency,
-		recurrenceUntil: shift.recurrenceUntil ?? '',
-		recurrenceDays: getRecurrenceDayValues(shift),
-		notes: shift.notes ?? ''
-	});
 
 	$effect(() => {
 		if (initializedFor === defaultFormKey) return;
 
+		const nextScope = sourceIsRecurring ? 'single' : 'series';
 		initializedFor = defaultFormKey;
-		editShift.fields.set(defaultFormValues);
+		editScope = nextScope;
+		editShift.fields.set(getDefaultFormValues(nextScope));
 	});
 
 	const totalHours = $derived(getShiftHours(startTime, endTime, Number(breakMinutes)));
@@ -93,7 +94,7 @@
 		`${formatClockTime(startTime)} - ${formatClockTime(endTime)}`
 	);
 	const repeatUntilMax = $derived(
-		parseCanonicalDate(shift.baseShiftDate)?.add({ years: RECURRENCE_LIMIT_YEARS }).toString()
+		parseCanonicalDate(shiftDate)?.add({ years: RECURRENCE_LIMIT_YEARS }).toString()
 	);
 
 	function getRecurrenceDayValue(dateValue: string) {
@@ -115,9 +116,39 @@
 		return [getRecurrenceDayValue(value.baseShiftDate)];
 	}
 
+	function getDefaultFormValues(scope: EditScope) {
+		const isSingleOccurrence = sourceIsRecurring && scope === 'single';
+		const activeShiftDate = isSingleOccurrence ? shift.shiftDate : shift.baseShiftDate;
+
+		return {
+			id: shift.ruleId.toString(),
+			occurrenceDate: shift.shiftDate,
+			locationId: shift.locationId.toString(),
+			shiftDate: activeShiftDate,
+			startTime: shift.startTime,
+			endTime: shift.endTime,
+			breakMinutes: shift.breakMinutes.toString() as (typeof breakMinuteOptions)[number],
+			recurrenceFrequency: (isSingleOccurrence
+				? 'none'
+				: shift.recurrenceFrequency) as RecurrenceFrequency,
+			recurrenceUntil: isSingleOccurrence ? '' : (shift.recurrenceUntil ?? ''),
+			recurrenceDays: isSingleOccurrence
+				? [getRecurrenceDayValue(shift.shiftDate)]
+				: getRecurrenceDayValues(shift),
+			notes: shift.notes ?? ''
+		};
+	}
+
+	function selectEditScope(scope: EditScope) {
+		if (editScope === scope) return;
+
+		editScope = scope;
+		editShift.fields.set(getDefaultFormValues(scope));
+	}
+
 	function resetForm(element: HTMLFormElement) {
 		element.reset();
-		editShift.fields.set(defaultFormValues);
+		editShift.fields.set(getDefaultFormValues(editScope));
 	}
 </script>
 
@@ -144,6 +175,7 @@
 	})}
 >
 	<input {...editShift.fields.id.as('hidden', shift.ruleId.toString())} />
+	<input {...editShift.fields.occurrenceDate.as('hidden', shift.shiftDate)} />
 
 	<DialogHeader class="border-b p-4">
 		<DialogTitle>Edit shift</DialogTitle>
@@ -155,6 +187,48 @@
 
 	<div class="grid max-h-[calc(100dvh-12rem)] gap-5 overflow-y-auto p-4 lg:grid-cols-[1fr_18rem]">
 		<div class="grid gap-4 md:grid-cols-2">
+			{#if sourceIsRecurring}
+				<fieldset class="space-y-2 md:col-span-2">
+					<legend class={labelClass}>Apply changes to</legend>
+					<div class="grid gap-2 sm:grid-cols-2">
+						<button
+							type="button"
+							class={[
+								'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors',
+								editScope === 'single'
+									? 'border-primary bg-primary/10 text-primary'
+									: 'bg-background hover:bg-muted/50'
+							]}
+							aria-pressed={editScope === 'single'}
+							onclick={() => selectEditScope('single')}
+						>
+							<CalendarDays class="size-4" />
+							This shift
+						</button>
+						<button
+							type="button"
+							class={[
+								'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors',
+								editScope === 'series'
+									? 'border-primary bg-primary/10 text-primary'
+									: 'bg-background hover:bg-muted/50'
+							]}
+							aria-pressed={editScope === 'series'}
+							onclick={() => selectEditScope('series')}
+						>
+							<Repeat2 class="size-4" />
+							Series
+						</button>
+					</div>
+					{#each editShift.fields.scope.issues() ?? [] as issue (issue.message)}
+						<p class={issueClass}>{issue.message}</p>
+					{/each}
+					{#each editShift.fields.occurrenceDate.issues() ?? [] as issue (issue.message)}
+						<p class={issueClass}>{issue.message}</p>
+					{/each}
+				</fieldset>
+			{/if}
+
 			<label class="space-y-2 md:col-span-2">
 				<span class={labelClass}>Location</span>
 				<span class="relative block">
@@ -188,7 +262,10 @@
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<input
-						{...editShift.fields.shiftDate.as('date', shift.baseShiftDate)}
+						{...editShift.fields.shiftDate.as(
+							'date',
+							editScope === 'single' ? shift.shiftDate : shift.baseShiftDate
+						)}
 						class={`${fieldClass} pl-9`}
 						required
 					/>
@@ -261,14 +338,21 @@
 					<Repeat2
 						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
-					<select
-						{...editShift.fields.recurrenceFrequency.as('select', shift.recurrenceFrequency)}
-						class={`${fieldClass} pl-9`}
-					>
-						{#each recurrenceFrequencyValues as option (option)}
-							<option value={option}>{recurrenceFrequencyLabels[option]}</option>
-						{/each}
-					</select>
+					{#if sourceIsRecurring && editScope === 'single'}
+						<input {...editShift.fields.recurrenceFrequency.as('hidden', 'none')} />
+						<span class={`${fieldClass} flex min-h-10 items-center pl-9 text-muted-foreground`}>
+							{recurrenceFrequencyLabels.none}
+						</span>
+					{:else}
+						<select
+							{...editShift.fields.recurrenceFrequency.as('select', shift.recurrenceFrequency)}
+							class={`${fieldClass} pl-9`}
+						>
+							{#each recurrenceFrequencyOptions as option (option)}
+								<option value={option}>{recurrenceFrequencyLabels[option]}</option>
+							{/each}
+						</select>
+					{/if}
 				</span>
 				{#each editShift.fields.recurrenceFrequency.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
@@ -282,7 +366,7 @@
 					class={fieldClass}
 					disabled={!isRecurring}
 					required={isRecurring}
-					min={shift.baseShiftDate}
+					min={shiftDate}
 					max={repeatUntilMax}
 				/>
 				{#each editShift.fields.recurrenceUntil.issues() ?? [] as issue (issue.message)}
@@ -349,8 +433,17 @@
 
 	<DialogFooter class="mx-0 mb-0 rounded-none border-t px-4 py-4">
 		<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
-		<Button type="submit" disabled={locations.length === 0 || editShift.pending > 0}>
-			{editShift.pending > 0 ? 'Saving...' : 'Save changes'}
+		<Button
+			{...editShift.fields.scope.as('submit', editScope)}
+			disabled={locations.length === 0 || editShift.pending > 0}
+		>
+			{editShift.pending > 0
+				? 'Saving...'
+				: sourceIsRecurring && editScope === 'single'
+					? 'Save this shift'
+					: sourceIsRecurring
+						? 'Save series'
+						: 'Save changes'}
 		</Button>
 	</DialogFooter>
 </form>

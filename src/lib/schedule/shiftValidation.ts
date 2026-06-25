@@ -11,6 +11,7 @@ import { isClockInput } from '$lib/schedule/time';
 
 export const scheduleWeekSchema = v.nullish(v.string());
 export const deleteShiftScopeValues = ['single', 'series'] as const;
+export const editShiftScopeValues = ['single', 'series'] as const;
 export const locationColorValues = [
 	'#16a34a',
 	'#2563eb',
@@ -140,44 +141,59 @@ export const editShiftSchema = v.pipe(
 			v.integer('Choose a shift.'),
 			v.minValue(1, 'Choose a shift.')
 		),
+		occurrenceDate: v.pipe(
+			v.string('Choose a shift date.'),
+			v.trim(),
+			v.minLength(1, 'Choose a shift date.'),
+			v.check(isCanonicalDate, 'Use a valid shift date.')
+		),
+		scope: v.picklist(editShiftScopeValues, 'Choose what to edit.'),
 		...shiftFormFields
 	}),
 	v.forward(
 		v.check(
-			({ recurrenceFrequency, recurrenceUntil, shiftDate }) =>
-				recurrenceFrequency === 'none' || recurrenceUntil === null || recurrenceUntil >= shiftDate,
+			({ scope, recurrenceFrequency, recurrenceUntil, shiftDate }) =>
+				scope === 'single' ||
+				recurrenceFrequency === 'none' ||
+				recurrenceUntil === null ||
+				recurrenceUntil >= shiftDate,
 			'Repeat until cannot be before the shift date.'
 		),
 		['recurrenceUntil']
 	),
 	v.forward(
 		v.check(
-			({ recurrenceFrequency, recurrenceUntil }) =>
-				recurrenceFrequency === 'none' || recurrenceUntil !== null,
+			({ scope, recurrenceFrequency, recurrenceUntil }) =>
+				scope === 'single' || recurrenceFrequency === 'none' || recurrenceUntil !== null,
 			'Choose a repeat end date.'
 		),
 		['recurrenceUntil']
 	),
 	v.forward(
 		v.check(
-			({ recurrenceFrequency, shiftDate, recurrenceUntil }) =>
-				recurrenceFrequency === 'none' || isWithinRecurrenceLimit(shiftDate, recurrenceUntil),
+			({ scope, recurrenceFrequency, shiftDate, recurrenceUntil }) =>
+				scope === 'single' ||
+				recurrenceFrequency === 'none' ||
+				isWithinRecurrenceLimit(shiftDate, recurrenceUntil),
 			`Repeat until must be within ${RECURRENCE_LIMIT_YEARS} year of the shift date.`
 		),
 		['recurrenceUntil']
 	),
 	v.forward(
 		v.check(
-			({ recurrenceFrequency, recurrenceDays }) =>
-				recurrenceFrequency === 'none' || recurrenceDays.length > 0,
+			({ scope, recurrenceFrequency, recurrenceDays }) =>
+				scope === 'single' || recurrenceFrequency === 'none' || recurrenceDays.length > 0,
 			'Choose at least one repeat day.'
 		),
 		['recurrenceDays']
 	),
 	v.transform((data) => ({
 		...data,
-		recurrenceUntil: data.recurrenceFrequency === 'none' ? null : data.recurrenceUntil,
-		recurrenceDays: data.recurrenceFrequency === 'none' ? null : data.recurrenceDays
+		recurrenceFrequency: data.scope === 'single' ? 'none' : data.recurrenceFrequency,
+		recurrenceUntil:
+			data.scope === 'single' || data.recurrenceFrequency === 'none' ? null : data.recurrenceUntil,
+		recurrenceDays:
+			data.scope === 'single' || data.recurrenceFrequency === 'none' ? null : data.recurrenceDays
 	}))
 );
 

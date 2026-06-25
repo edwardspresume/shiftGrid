@@ -200,6 +200,7 @@ test('creates a location and schedules a shift at it', async ({ page }) => {
 	const startTime = formatHourInput(startHour);
 	const endTime = formatHourInput(endHour);
 	const shiftLabel = `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`;
+	const shiftNotes = `Cover east desk ${Date.now()}`;
 
 	await page.goto(`/?week=${shiftDate}`);
 	await page.getByRole('button', { name: 'Add location' }).click();
@@ -215,6 +216,7 @@ test('creates a location and schedules a shift at it', async ({ page }) => {
 	await shiftDialog.getByLabel('Location').selectOption({ label: locationName });
 	await shiftDialog.getByLabel('Start time').fill(startTime);
 	await shiftDialog.getByLabel('End time').fill(endTime);
+	await shiftDialog.getByLabel('Notes').fill(shiftNotes);
 	await shiftDialog.getByRole('button', { name: 'Add shift' }).click();
 
 	await expect(shiftDialog).toBeHidden();
@@ -223,6 +225,9 @@ test('creates a location and schedules a shift at it', async ({ page }) => {
 	).toBeVisible();
 	await expect(
 		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toBeVisible();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftNotes)
 	).toBeVisible();
 });
 
@@ -422,4 +427,68 @@ test('shows recurring shifts through repeat until and blocks occurrence overlaps
 	await expect(
 		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
 	).toHaveCount(0);
+});
+
+test('edits one recurring occurrence as a standalone shift', async ({ page }) => {
+	const shiftDate = getIsolatedFutureSunday();
+	const nextWeekDate = addDays(shiftDate, 7);
+	const repeatUntil = addDays(shiftDate, 14);
+	const startHour = 12 + Math.floor(Math.random() * 3);
+	const endHour = startHour + 1;
+	const editedStartHour = endHour;
+	const editedEndHour = editedStartHour + 1;
+	const startTime = formatHourInput(startHour);
+	const endTime = formatHourInput(endHour);
+	const editedStartTime = formatHourInput(editedStartHour);
+	const editedEndTime = formatHourInput(editedEndHour);
+	const shiftLabel = `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`;
+	const editedShiftLabel = `${formatHourLabel(editedStartHour)} - ${formatHourLabel(editedEndHour)}`;
+	const editedNotes = `Standalone occurrence ${Date.now()}`;
+
+	await page.goto(`/?week=${shiftDate}`);
+	let dialog = await openFirstDayAddShiftDialog(page);
+
+	await expect(dialog.getByLabel('Date')).toHaveValue(shiftDate);
+	await dialog.getByLabel('Start time').fill(startTime);
+	await dialog.getByLabel('End time').fill(endTime);
+	await dialog.getByLabel('Recurrence').selectOption('weekly');
+	await dialog.getByLabel('Repeat until').fill(repeatUntil);
+	await dialog.getByRole('button', { name: 'Add shift' }).click();
+
+	await expect(dialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toBeVisible();
+
+	await page.goto(`/?week=${nextWeekDate}`);
+	await openShiftActions(page, shiftLabel);
+	await page.getByRole('menuitem', { name: 'Edit' }).click();
+
+	const editDialog = page.getByRole('dialog', { name: 'Edit shift' });
+	await expect(editDialog).toBeVisible();
+	await expect(editDialog.getByRole('button', { name: 'This shift', exact: true })).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
+	await expect(editDialog.getByLabel('Date')).toHaveValue(nextWeekDate);
+	await editDialog.getByLabel('Start time').fill(editedStartTime);
+	await editDialog.getByLabel('End time').fill(editedEndTime);
+	await editDialog.getByLabel('Notes').fill(editedNotes);
+	await editDialog.getByRole('button', { name: 'Save this shift' }).click();
+
+	await expect(editDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(editedShiftLabel)
+	).toBeVisible();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(editedNotes)
+	).toBeVisible();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toHaveCount(0);
+
+	await page.goto(`/?week=${shiftDate}`);
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toBeVisible();
 });

@@ -4,7 +4,15 @@
 	import type { ScheduledShift } from '$lib/schedule/shifts.remote';
 	import { formatDayLabel, getWeekDays } from '$lib/schedule/week';
 	import type { CalendarDate } from '@internationalized/date';
-	import { Clock3, MoreVertical, Pencil, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
+	import {
+		Clock3,
+		MoreVertical,
+		NotebookPen,
+		Pencil,
+		Plus,
+		RefreshCw,
+		Trash2
+	} from '@lucide/svelte';
 
 	type ShiftDay = {
 		id: string;
@@ -40,8 +48,6 @@
 	const formatHours = (hours: number) => `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
 
 	const formatShiftCount = (count: number) => `${count} ${count === 1 ? 'shift' : 'shifts'}`;
-
-	const isRecurring = (shift: ScheduledShift) => shift.recurrenceFrequency !== 'none';
 </script>
 
 <section aria-label="Weekly shift grid" class="grid grid-cols-7 gap-3">
@@ -111,7 +117,7 @@
 									<DropdownMenu.Content align="end">
 										<DropdownMenu.Item onSelect={() => onEditShift(shift)}>
 											<Pencil class="size-4" />
-											{isRecurring(shift) ? 'Edit series' : 'Edit'}
+											Edit
 										</DropdownMenu.Item>
 										<DropdownMenu.Separator />
 										<DropdownMenu.Item onSelect={() => onDeleteShift(shift)} variant="destructive">
@@ -122,14 +128,25 @@
 								</DropdownMenu.Root>
 							</header>
 
-							<div class="mt-3 flex items-start gap-2 border-t pt-3">
-								<Clock3 class="mt-0.5 size-3.5 shrink-0 text-primary" />
-								<div class="min-w-0">
-									<p class="text-xs leading-snug font-semibold">{shift.time}</p>
-									<p class="mt-1 text-xs font-medium text-muted-foreground">
-										{shift.hours} total
-									</p>
+							<div class="mt-3 border-t pt-3">
+								<div class="flex items-start gap-2">
+									<Clock3 class="mt-0.5 size-3.5 shrink-0 text-primary" />
+									<div class="min-w-0">
+										<p class="text-xs leading-snug font-semibold">{shift.time}</p>
+										<p class="mt-1 text-xs font-medium text-muted-foreground">
+											{shift.hours} total
+										</p>
+									</div>
 								</div>
+
+								{#if shift.notes}
+									<div
+										class="mt-2 flex items-start gap-1.5 rounded-md bg-muted/35 px-2 py-1.5 text-xs leading-snug font-medium text-muted-foreground"
+									>
+										<NotebookPen class="mt-0.5 size-3.5 shrink-0" />
+										<p class="min-w-0 break-words whitespace-pre-wrap">{shift.notes}</p>
+									</div>
+								{/if}
 							</div>
 						</article>
 					{/each}
