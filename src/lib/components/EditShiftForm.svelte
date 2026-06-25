@@ -30,6 +30,10 @@
 	import { CalendarDays, Clock3, MapPin, NotebookPen, Repeat2, Utensils } from '@lucide/svelte';
 
 	type EditScope = 'single' | 'series';
+	type RepeatUntilPreset = {
+		label: string;
+		duration: { days?: number; months?: number };
+	};
 
 	let {
 		locations,
@@ -52,6 +56,11 @@
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground disabled:opacity-70';
 	const labelClass = 'text-xs font-semibold text-muted-foreground uppercase';
 	const issueClass = 'text-xs font-medium text-destructive';
+	const repeatUntilPresets: RepeatUntilPreset[] = [
+		{ label: '2 weeks', duration: { days: 14 } },
+		{ label: '1 month', duration: { months: 1 } },
+		{ label: '3 months', duration: { months: 3 } }
+	];
 	const defaultLocationId = $derived(shift.locationId.toString());
 	const defaultFormKey = $derived(`${shift.ruleId}:${shift.baseShiftDate}:${shift.shiftDate}`);
 	const sourceIsRecurring = $derived(shift.recurrenceFrequency !== 'none');
@@ -72,6 +81,7 @@
 	const recurrenceFrequency = $derived(
 		String(editShift.fields.recurrenceFrequency.value() || shift.recurrenceFrequency)
 	);
+	const recurrenceUntil = $derived(String(editShift.fields.recurrenceUntil.value() || ''));
 	const isRecurring = $derived(recurrenceFrequency !== 'none');
 	const selectedLocation = $derived(
 		locations.find((location) => location.id.toString() === activeLocationId) ??
@@ -144,6 +154,43 @@
 
 		editScope = scope;
 		editShift.fields.set(getDefaultFormValues(scope));
+	}
+
+	function getPresetRepeatUntil(preset: RepeatUntilPreset) {
+		const date = parseCanonicalDate(shiftDate);
+		if (!date) return '';
+
+		const presetDate = date.add(preset.duration);
+		const maxDate = repeatUntilMax ? parseCanonicalDate(repeatUntilMax) : null;
+
+		return maxDate && presetDate.compare(maxDate) > 0 ? maxDate.toString() : presetDate.toString();
+	}
+
+	function getCurrentRecurrenceDays() {
+		const currentDays = editShift.fields.recurrenceDays.value();
+
+		return Array.isArray(currentDays) && currentDays.length > 0
+			? (currentDays as (typeof recurrenceDayValues)[number][])
+			: getDefaultFormValues(editScope).recurrenceDays;
+	}
+
+	function applyRepeatUntilPreset(preset: RepeatUntilPreset) {
+		const presetDate = getPresetRepeatUntil(preset);
+		if (!presetDate) return;
+
+		editShift.fields.set({
+			id: shift.ruleId.toString(),
+			occurrenceDate: shift.shiftDate,
+			locationId: activeLocationId,
+			shiftDate,
+			startTime,
+			endTime,
+			breakMinutes: breakMinutes as (typeof breakMinuteOptions)[number],
+			recurrenceFrequency: recurrenceFrequency as RecurrenceFrequency,
+			recurrenceUntil: presetDate,
+			recurrenceDays: getCurrentRecurrenceDays(),
+			notes: String(editShift.fields.notes.value() || '')
+		});
 	}
 
 	function resetForm(element: HTMLFormElement) {
@@ -359,20 +406,41 @@
 				{/each}
 			</label>
 
-			<label class={['space-y-2', !isRecurring && 'opacity-60']}>
-				<span class={labelClass}>Repeat until</span>
-				<input
-					{...editShift.fields.recurrenceUntil.as('date')}
-					class={fieldClass}
-					disabled={!isRecurring}
-					required={isRecurring}
-					min={shiftDate}
-					max={repeatUntilMax}
-				/>
+			<div class={['space-y-2', !isRecurring && 'opacity-60']}>
+				<label class="block space-y-2">
+					<span class={labelClass}>Repeat until</span>
+					<input
+						{...editShift.fields.recurrenceUntil.as('date')}
+						class={fieldClass}
+						disabled={!isRecurring}
+						required={isRecurring}
+						min={shiftDate}
+						max={repeatUntilMax}
+					/>
+				</label>
+				<div class="grid grid-cols-3 gap-1.5">
+					{#each repeatUntilPresets as preset (preset.label)}
+						{@const presetValue = getPresetRepeatUntil(preset)}
+						<button
+							type="button"
+							class={[
+								'min-h-8 rounded-lg border px-2 text-xs font-semibold transition-colors',
+								recurrenceUntil === presetValue
+									? 'border-primary bg-primary/10 text-primary'
+									: 'bg-background hover:bg-muted/50'
+							]}
+							aria-pressed={recurrenceUntil === presetValue}
+							disabled={!isRecurring || !presetValue}
+							onclick={() => applyRepeatUntilPreset(preset)}
+						>
+							{preset.label}
+						</button>
+					{/each}
+				</div>
 				{#each editShift.fields.recurrenceUntil.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
-			</label>
+			</div>
 
 			<fieldset class={['space-y-2 md:col-span-2', !isRecurring && 'opacity-60']}>
 				<legend class={labelClass}>Repeat days</legend>

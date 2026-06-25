@@ -360,7 +360,8 @@ test('shows recurring shifts through repeat until and blocks occurrence overlaps
 	await dialog.getByLabel('Recurrence').selectOption('weekly');
 	await expect(dialog.getByLabel('Repeat until')).toBeEnabled();
 	await dialog.getByText('Mon', { exact: true }).click();
-	await dialog.getByLabel('Repeat until').fill(repeatUntil);
+	await dialog.getByRole('button', { name: '2 weeks' }).click();
+	await expect(dialog.getByLabel('Repeat until')).toHaveValue(repeatUntil);
 	await dialog.getByRole('button', { name: 'Add shift' }).click();
 
 	await expect(dialog).toBeHidden();
@@ -470,6 +471,10 @@ test('edits one recurring occurrence as a standalone shift', async ({ page }) =>
 		'aria-pressed',
 		'true'
 	);
+	await editDialog.getByRole('button', { name: 'Series' }).click();
+	await editDialog.getByRole('button', { name: '2 weeks' }).click();
+	await expect(editDialog.getByLabel('Repeat until')).toHaveValue(repeatUntil);
+	await editDialog.getByRole('button', { name: 'This shift', exact: true }).click();
 	await expect(editDialog.getByLabel('Date')).toHaveValue(nextWeekDate);
 	await editDialog.getByLabel('Start time').fill(editedStartTime);
 	await editDialog.getByLabel('End time').fill(editedEndTime);

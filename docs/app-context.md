@@ -18,6 +18,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Per-day add-shift buttons that open a modal form with the date fixed to that day.
 - Users can create owned locations from the weekly schedule page.
 - Shift form fields for location, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
+- Recurring shift forms include repeat-until presets for 2 weeks, 1 month, and 3 months while keeping the exact date input editable.
 - Shift cards show location, recurrence label, time range, total hours, and notes when present.
 - Shift cards include a three-dot actions menu with edit and delete actions.
 - Overnight shifts are supported by treating an end time earlier than or equal to the start time as next-day coverage.
