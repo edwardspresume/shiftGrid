@@ -46,7 +46,8 @@ The app is operational rather than marketing-focused: the main screen is the wor
 ## Data Model
 
 - Database scripts read `DATABASE_URL` from dotenv files. `pnpm db:migrate` uses `.env`, `pnpm db:migrate:test` uses `.env.test`, and `pnpm db:migrate:production` uses `.env.production`.
-- `pnpm db:copy:test-to-production` replaces production users and scheduling data with rows from test using `.env.test` and `.env.production`. It copies `user`, `account`, `team_members`, `shifts`, and shift exception child rows, truncates sessions, and does not copy live session rows.
+- Playwright E2E scripts preload `.env.test` so test seed data is created in the test database, not production.
+- `pnpm db:copy:test-to-production` replaces production users and scheduling data with rows from test using `.env.test` and `.env.production`. It copies `user`, `account`, `team_members`, `shifts`, and shift exception child rows, excludes the E2E login plus `E2E ...` team members and their child data, truncates sessions, and does not copy live session rows.
 - `user.role` stores the role enum used for application-level permissions.
 - `team_members` stores the shared assignable people list: `id`, `name`, `color`, audit user ids, and timestamps.
 - `shifts` stores the scheduling rule: `team_member_id`, base date, start/end time, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, audit user ids, and timestamps.

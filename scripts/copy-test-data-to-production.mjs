@@ -100,6 +100,8 @@ const truncateTableNames = [
 
 const serialTables = ['team_members', 'shifts', 'shift_exceptions'];
 const chunkSize = 100;
+const e2eUserEmail = 'e2e@shiftgrid.local';
+const e2eTeamMemberPrefix = 'E2E ';
 
 const quoteIdentifier = (identifier) => `"${identifier.replaceAll('"', '""')}"`;
 
@@ -119,6 +121,68 @@ for (const table of tables) {
 	);
 	rowsByTable.set(table.name, rows);
 }
+
+const excludedUserIds = new Set(
+	rowsByTable
+		.get('user')
+		.filter((row) => row.email?.toLowerCase() === e2eUserEmail)
+		.map((row) => row.id)
+);
+const excludedTeamMemberIds = new Set(
+	rowsByTable
+		.get('team_members')
+		.filter((row) => row.name.startsWith(e2eTeamMemberPrefix))
+		.map((row) => row.id)
+);
+const excludedShiftIds = new Set(
+	rowsByTable
+		.get('shifts')
+		.filter((row) => excludedTeamMemberIds.has(row.team_member_id))
+		.map((row) => row.id)
+);
+
+rowsByTable.set(
+	'user',
+	rowsByTable.get('user').filter((row) => !excludedUserIds.has(row.id))
+);
+rowsByTable.set(
+	'account',
+	rowsByTable.get('account').filter((row) => !excludedUserIds.has(row.user_id))
+);
+rowsByTable.set(
+	'team_members',
+	rowsByTable
+		.get('team_members')
+		.filter((row) => !excludedTeamMemberIds.has(row.id))
+		.map((row) => ({
+			...row,
+			created_by_user_id: excludedUserIds.has(row.created_by_user_id)
+				? null
+				: row.created_by_user_id,
+			updated_by_user_id: excludedUserIds.has(row.updated_by_user_id)
+				? null
+				: row.updated_by_user_id
+		}))
+);
+rowsByTable.set(
+	'shifts',
+	rowsByTable
+		.get('shifts')
+		.filter((row) => !excludedShiftIds.has(row.id))
+		.map((row) => ({
+			...row,
+			created_by_user_id: excludedUserIds.has(row.created_by_user_id)
+				? null
+				: row.created_by_user_id,
+			updated_by_user_id: excludedUserIds.has(row.updated_by_user_id)
+				? null
+				: row.updated_by_user_id
+		}))
+);
+rowsByTable.set(
+	'shift_exceptions',
+	rowsByTable.get('shift_exceptions').filter((row) => !excludedShiftIds.has(row.shift_id))
+);
 
 const queries = [
 	{

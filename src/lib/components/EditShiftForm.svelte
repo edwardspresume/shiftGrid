@@ -222,7 +222,6 @@
 		<DialogDescription class="sr-only">
 			Update a scheduled shift with team member, date, time, recurrence, and notes.
 		</DialogDescription>
-		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
 	</DialogHeader>
 
 	<div class="grid max-h-[calc(100dvh-12rem)] gap-5 overflow-y-auto p-4 lg:grid-cols-[1fr_18rem]">
@@ -295,7 +294,7 @@
 				{/each}
 			</label>
 
-			<label class="space-y-2">
+			<label class="space-y-2 md:col-span-2">
 				<span class={labelClass}>Date</span>
 				<span class="relative block">
 					<CalendarDays
@@ -315,39 +314,48 @@
 				{/each}
 			</label>
 
-			<label class="space-y-2">
-				<span class={labelClass}>Start time</span>
-				<span class="relative block">
-					<Clock3
-						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<input
-						{...editShift.fields.startTime.as('time', shift.startTime)}
-						class={`${fieldClass} pl-9`}
-						required
-					/>
-				</span>
-				{#each editShift.fields.startTime.issues() ?? [] as issue (issue.message)}
-					<p class={issueClass}>{issue.message}</p>
-				{/each}
-			</label>
+			<fieldset class="space-y-2 md:col-span-2">
+				<legend class="sr-only">Time</legend>
+				<div class="flex min-h-5 items-center justify-between gap-3">
+					<span class={labelClass}>Time</span>
+					<p class="text-xs font-semibold text-muted-foreground">{formattedHours} total</p>
+				</div>
+				<div class="grid gap-4 sm:grid-cols-2">
+					<label class="space-y-2">
+						<span class={labelClass}>Start time</span>
+						<span class="relative block">
+							<Clock3
+								class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+							/>
+							<input
+								{...editShift.fields.startTime.as('time', shift.startTime)}
+								class={`${fieldClass} pl-9`}
+								required
+							/>
+						</span>
+						{#each editShift.fields.startTime.issues() ?? [] as issue (issue.message)}
+							<p class={issueClass}>{issue.message}</p>
+						{/each}
+					</label>
 
-			<label class="space-y-2">
-				<span class={labelClass}>End time</span>
-				<span class="relative block">
-					<Clock3
-						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<input
-						{...editShift.fields.endTime.as('time', shift.endTime)}
-						class={`${fieldClass} pl-9`}
-						required
-					/>
-				</span>
-				{#each editShift.fields.endTime.issues() ?? [] as issue (issue.message)}
-					<p class={issueClass}>{issue.message}</p>
-				{/each}
-			</label>
+					<label class="space-y-2">
+						<span class={labelClass}>End time</span>
+						<span class="relative block">
+							<Clock3
+								class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+							/>
+							<input
+								{...editShift.fields.endTime.as('time', shift.endTime)}
+								class={`${fieldClass} pl-9`}
+								required
+							/>
+						</span>
+						{#each editShift.fields.endTime.issues() ?? [] as issue (issue.message)}
+							<p class={issueClass}>{issue.message}</p>
+						{/each}
+					</label>
+				</div>
+			</fieldset>
 
 			<label class="space-y-2">
 				<span class={labelClass}>Recurrence</span>

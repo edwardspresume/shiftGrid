@@ -47,6 +47,9 @@ pnpm db:migrate:test
 pnpm db:migrate:production
 ```
 
+The Playwright end-to-end scripts explicitly load `.env.test` so E2E seed data stays out of
+production.
+
 To replace production users and scheduling data with test data after both schemas are migrated, run:
 
 ```sh
@@ -55,7 +58,8 @@ pnpm db:copy:test-to-production
 
 That command truncates production `user`, `account`, `session`, `team_members`, `shifts`, and
 `shift_exceptions` data before copying `user`, `account`, `team_members`, `shifts`, and
-`shift_exceptions` rows from `.env.test`. It does not copy live sessions, so users may need to
+`shift_exceptions` rows from `.env.test`. It excludes the E2E login and `E2E ...` team members,
+along with their shifts and shift exceptions. It does not copy live sessions, so users may need to
 sign in again.
 
 ## Building
