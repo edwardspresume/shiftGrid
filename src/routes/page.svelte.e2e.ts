@@ -1,4 +1,120 @@
+import 'dotenv/config';
+
+import { neon } from '@neondatabase/serverless';
 import { expect, test, type Page } from '@playwright/test';
+import { hashPassword } from 'better-auth/crypto';
+import { and, eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { account, user } from '../lib/server/db/auth.schema';
+import { locations } from '../lib/server/db/schema';
+
+const E2E_EMAIL = 'e2e@shiftgrid.local';
+const E2E_PASSWORD = 'ShiftGridE2E123!';
+
+async function ensureE2EUser() {
+	if (!process.env.DATABASE_URL) {
+		throw new Error('DATABASE_URL is not set');
+	}
+
+	const db = drizzle(neon(process.env.DATABASE_URL));
+	const now = new Date();
+	const [seededUser] = await db
+		.insert(user)
+		.values({
+			id: crypto.randomUUID(),
+			name: 'ShiftGrid E2E',
+			email: E2E_EMAIL,
+			emailVerified: true,
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: user.email,
+			set: {
+				name: 'ShiftGrid E2E',
+				emailVerified: true,
+				updatedAt: now
+			}
+		})
+		.returning({ id: user.id });
+
+	if (!seededUser) {
+		throw new Error('Failed to seed E2E user');
+	}
+
+	const userId = seededUser.id;
+	const accountId = `${userId}:credential`;
+
+	const password = await hashPassword(E2E_PASSWORD);
+	await db
+		.insert(account)
+		.values({
+			id: accountId,
+			accountId: userId,
+			providerId: 'credential',
+			userId,
+			password,
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: account.id,
+			set: {
+				accountId: userId,
+				password,
+				updatedAt: now
+			}
+		});
+
+	await db
+		.update(account)
+		.set({
+			accountId: userId,
+			password,
+			updatedAt: now
+		})
+		.where(and(eq(account.userId, userId), eq(account.providerId, 'credential')));
+
+	const [existingLocation] = await db
+		.select({ id: locations.id })
+		.from(locations)
+		.where(and(eq(locations.userId, userId), eq(locations.name, 'E2E Location')))
+		.limit(1);
+
+	if (existingLocation) {
+		await db
+			.update(locations)
+			.set({
+				color: '#16a34a',
+				updatedAt: now
+			})
+			.where(eq(locations.id, existingLocation.id));
+	} else {
+		await db.insert(locations).values({
+			userId,
+			name: 'E2E Location',
+			color: '#16a34a',
+			createdAt: now,
+			updatedAt: now
+		});
+	}
+}
+
+async function signIn(page: Page) {
+	await page.goto('/login');
+	await page.getByLabel('Email').fill(E2E_EMAIL);
+	await page.getByLabel('Password').fill(E2E_PASSWORD);
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.getByText('Weekly schedule')).toBeVisible();
+}
+
+test.beforeAll(async () => {
+	await ensureE2EUser();
+});
+
+test.beforeEach(async ({ page }) => {
+	await signIn(page);
+});
 
 function formatDate(date: Date) {
 	return date.toISOString().slice(0, 10);
@@ -74,6 +190,40 @@ test('opens the add shift dialog from a day action', async ({ page }) => {
 	await expect(dialog.getByLabel('Start time')).toBeVisible();
 	await expect(dialog.getByLabel('End time')).toBeVisible();
 	await expect(dialog.getByRole('button', { name: 'Add shift' })).toBeVisible();
+});
+
+test('creates a location and schedules a shift at it', async ({ page }) => {
+	const shiftDate = getIsolatedFutureSunday();
+	const locationName = `E2E North ${Date.now()}`;
+	const startHour = 11 + Math.floor(Math.random() * 3);
+	const endHour = startHour + 1;
+	const startTime = formatHourInput(startHour);
+	const endTime = formatHourInput(endHour);
+	const shiftLabel = `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`;
+
+	await page.goto(`/?week=${shiftDate}`);
+	await page.getByRole('button', { name: 'Add location' }).click();
+
+	const locationDialog = page.getByRole('dialog', { name: 'Add location' });
+	await expect(locationDialog).toBeVisible();
+	await locationDialog.getByLabel('Name').fill(locationName);
+	await locationDialog.getByRole('button', { name: 'Add location' }).click();
+	await expect(locationDialog).toBeHidden();
+
+	const shiftDialog = await openFirstDayAddShiftDialog(page);
+	await expect(shiftDialog.getByLabel('Date')).toHaveValue(shiftDate);
+	await shiftDialog.getByLabel('Location').selectOption({ label: locationName });
+	await shiftDialog.getByLabel('Start time').fill(startTime);
+	await shiftDialog.getByLabel('End time').fill(endTime);
+	await shiftDialog.getByRole('button', { name: 'Add shift' }).click();
+
+	await expect(shiftDialog).toBeHidden();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(locationName)
+	).toBeVisible();
+	await expect(
+		page.getByRole('region', { name: 'Weekly shift grid' }).getByText(shiftLabel)
+	).toBeVisible();
 });
 
 test('adds a shift to the active week and blocks overlapping shift hours', async ({ page }) => {

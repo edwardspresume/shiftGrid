@@ -10,10 +10,13 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 ## Current User Features
 
+- Invite-only access using Better Auth email/password authentication.
+- Public registration is disabled; the initial owner account is seeded with `pnpm auth:seed-owner` using `SHIFTGRID_OWNER_*` or `AUTH_SEED_*` environment variables.
 - Weekly schedule grid with one column per day.
 - Week navigation for previous week, next week, current week, and date-based week selection.
 - Summary stats for total scheduled hours, shift count, and active location count.
 - Per-day add-shift buttons that open a modal form with the date fixed to that day.
+- Users can create owned locations from the weekly schedule page.
 - Shift form fields for location, date, break, start time, end time, recurrence, repeat-until, repeat days, and shift notes.
 - Shift cards show location, recurrence label, time range, and total hours.
 - Shift cards include a three-dot actions menu with edit and delete actions.
@@ -35,16 +38,20 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 ## Data Model
 
-- `locations` stores `id`, `name`, `color`, and timestamps.
-- `shifts` stores the scheduling rule: location, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, and timestamps.
+- `locations` stores `id`, `user_id`, `name`, `color`, and timestamps.
+- `locations` stores nullable `user_id` ownership. The owner seed claims unowned rows so existing demo locations become visible to the seeded owner.
+- `shifts` stores nullable `user_id` ownership plus the scheduling rule: location, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, and timestamps.
 - `shift_exceptions` stores per-occurrence changes for recurring series. It currently supports constrained `cancelled` occurrences.
-- Better Auth demo tables still exist separately under the auth schema.
+- Better Auth tables (`user`, `session`, `account`, `verification`) support email/password login. Password credentials are stored in `account` rows with `provider_id = 'credential'`.
 
 ## Remote Data Flow
 
 - Remote functions live in `src/lib/schedule/shifts.remote.ts`.
+- Auth form remote functions live in `src/lib/auth/auth.remote.ts`.
+- Schedule queries and mutations require an authenticated Better Auth session and only read/write rows owned by `locals.user.id`.
 - `getSchedule(week)` returns only the requested week's expanded shift occurrences and weekly summary.
 - `getLocations()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static location data.
+- `addLocation` validates a user-owned location name/color, blocks duplicate names for the current user, inserts with `locals.user.id`, and refreshes `getLocations()`.
 - `addShift` validates input, checks location existence, checks overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
 - `editShift` validates the same scheduling rules, excludes the edited rule during overlap checks, updates the stored rule, clears cancellation exceptions when the recurrence pattern changes, and accepts one requested `getSchedule` refresh.
 - `deleteShift` deletes one-time shifts directly, deletes recurring series directly, or creates a cancelled occurrence exception for a single recurring shift.
@@ -53,6 +60,10 @@ The app is operational rather than marketing-focused: the main screen is the wor
 ## Important Source Areas
 
 - `src/routes/+page.svelte`: main schedule page, week state, modal state, and remote query usage.
+- `src/routes/login/+page.svelte`: invite-only email/password login form.
+- `src/lib/auth/auth.remote.ts`: login/logout remote forms backed by Better Auth.
+- `scripts/seed-owner.mjs`: environment-driven owner account seeding for invite-only deployments.
+- `src/lib/components/AddLocationForm.svelte`: add-location remote form UI.
 - `src/lib/components/ShiftWeekGrid.svelte`: weekly grid, day columns, shift cards, and day-level add actions.
 - `src/lib/components/AddShiftForm.svelte`: add-shift remote form UI, field defaults, recurrence controls, and scoped post-submit refresh.
 - `src/lib/components/EditShiftForm.svelte`: edit-shift remote form UI for updating stored shift rules.
@@ -68,7 +79,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - There is no single-occurrence edit flow yet. Add modified exception rows before supporting "Edit this shift" for one item in a recurring series.
 - There is no "this and future shifts" edit/delete behavior yet. That requires splitting a recurring rule at the selected occurrence date.
 - Recurrence supports weekly and biweekly weekday patterns; monthly and end-after-N-occurrences rules do not exist yet.
-- Location management UI is not present in the main scheduling workflow.
+- Location editing/deletion UI is not present in the main scheduling workflow.
 
 ## Maintenance Notes For Agents
 

@@ -1,9 +1,11 @@
 <script lang="ts">
+	import AddLocationForm from '$lib/components/AddLocationForm.svelte';
 	import AddShiftForm from '$lib/components/AddShiftForm.svelte';
 	import DeleteShiftDialog from '$lib/components/DeleteShiftDialog.svelte';
 	import EditShiftForm from '$lib/components/EditShiftForm.svelte';
 	import ShiftWeekGrid from '$lib/components/ShiftWeekGrid.svelte';
 	import SiteHeader from '$lib/components/SiteHeader.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
 	import WeekSelector from '$lib/components/WeekSelector.svelte';
 	import { getLocations, getSchedule, type ScheduledShift } from '$lib/schedule/shifts.remote';
@@ -14,7 +16,7 @@
 		type WeekStartsOn
 	} from '$lib/schedule/week';
 	import { parseDate, type CalendarDate, type DateValue } from '@internationalized/date';
-	import { BriefcaseBusiness, Clock3, MapPin } from '@lucide/svelte';
+	import { BriefcaseBusiness, Clock3, MapPin, Plus } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -23,6 +25,7 @@
 	const schedule = $derived(await getSchedule(page.url.searchParams.get('week')));
 	const locations = $derived(await getLocations());
 	const weekStart: CalendarDate = $derived(parseDate(schedule.weekStart));
+	let isAddLocationFormOpen = $state(false);
 	let isAddShiftFormOpen = $state(false);
 	let isEditShiftFormOpen = $state(false);
 	let isDeleteShiftDialogOpen = $state(false);
@@ -76,6 +79,14 @@
 		isAddShiftFormOpen = true;
 	}
 
+	function openAddLocationForm() {
+		isAddLocationFormOpen = true;
+	}
+
+	function closeAddLocationForm() {
+		isAddLocationFormOpen = false;
+	}
+
 	function closeAddShiftForm() {
 		isAddShiftFormOpen = false;
 	}
@@ -116,24 +127,37 @@
 			/>
 		</div>
 
-		<section aria-label="Weekly summary" class="mt-5 grid grid-cols-3 gap-3">
-			{#each summaryStats as stat (stat.label)}
-				{@const Icon = stat.icon}
-				<div class="flex items-center gap-3 border-l px-4 py-1">
-					<div class="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-						<Icon class="size-4" />
-					</div>
+		<div class="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+			<section aria-label="Weekly summary" class="grid flex-1 grid-cols-3 gap-3">
+				{#each summaryStats as stat (stat.label)}
+					{@const Icon = stat.icon}
+					<div class="flex items-center gap-3 border-l px-4 py-1">
+						<div class="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
+							<Icon class="size-4" />
+						</div>
 
-					<div>
-						<p class="text-xs font-semibold text-muted-foreground uppercase">
-							{stat.label}
-						</p>
-						<p class="mt-0.5 font-heading text-2xl leading-none font-black">{stat.value}</p>
+						<div>
+							<p class="text-xs font-semibold text-muted-foreground uppercase">
+								{stat.label}
+							</p>
+							<p class="mt-0.5 font-heading text-2xl leading-none font-black">{stat.value}</p>
+						</div>
 					</div>
-				</div>
-			{/each}
-		</section>
+				{/each}
+			</section>
+
+			<Button type="button" class="w-full gap-2 lg:w-auto" onclick={openAddLocationForm}>
+				<Plus class="size-4" />
+				Add location
+			</Button>
+		</div>
 	</header>
+
+	<Dialog bind:open={isAddLocationFormOpen}>
+		<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-md">
+			<AddLocationForm onCancel={closeAddLocationForm} />
+		</DialogContent>
+	</Dialog>
 
 	<Dialog bind:open={isAddShiftFormOpen}>
 		<DialogContent

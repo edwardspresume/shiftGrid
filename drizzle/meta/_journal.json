@@ -43,6 +43,13 @@
       "when": 1782360000000,
       "tag": "0005_constrain_shift_exception_action",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782363600000,
+      "tag": "0006_add_schedule_ownership",
+      "breakpoints": true
     }
   ]
 }

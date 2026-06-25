@@ -26,7 +26,8 @@
 		"db:migrate:kit": "DOTENV_CONFIG_PATH=.env drizzle-kit migrate --config=drizzle.config.ts",
 		"db:studio": "DOTENV_CONFIG_PATH=.env drizzle-kit studio --config=drizzle.config.ts",
 		"db:push": "DOTENV_CONFIG_PATH=.env drizzle-kit push --config=drizzle.config.ts",
-		"auth:schema": "better-auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
+		"auth:schema": "better-auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes",
+		"auth:seed-owner": "DOTENV_CONFIG_PATH=.env node scripts/seed-owner.mjs"
 	},
 	"devDependencies": {
 		"@better-auth/cli": "~1.4.21",

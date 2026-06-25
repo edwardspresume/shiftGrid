@@ -7,6 +7,7 @@ import {
 } from '$lib/schedule/constants';
 import { parseCanonicalDate } from '$lib/schedule/date';
 import {
+	addLocationSchema,
 	addShiftSchema,
 	deleteShiftSchema,
 	editShiftSchema,
@@ -21,8 +22,8 @@ import {
 	shiftMinuteRangesOverlap
 } from '$lib/schedule/time';
 import { DEFAULT_WEEK_STARTS_ON, getCurrentWeekStart, getWeekStart } from '$lib/schedule/week';
-import { invalid } from '@sveltejs/kit';
-import { form, query, requested } from '$app/server';
+import { error, invalid } from '@sveltejs/kit';
+import { form, getRequestEvent, query, requested } from '$app/server';
 import { and, asc, eq, gte, inArray, lte, ne, or } from 'drizzle-orm';
 import type { CalendarDate } from '@internationalized/date';
 
@@ -35,6 +36,16 @@ type ShiftRule = {
 	recurrenceUntil: string | null;
 	recurrenceDays: number[] | null;
 };
+
+function requireAuthenticatedUserId() {
+	const { locals } = getRequestEvent();
+
+	if (!locals.user) {
+		error(401, 'Unauthorized');
+	}
+
+	return locals.user.id;
+}
 
 function resolveWeekStart(week: string | null | undefined) {
 	if (!week) {
@@ -146,6 +157,8 @@ function getShiftDateWindowWhere(windowStart: string, windowEnd: string) {
 }
 
 export const getLocations = query(async () => {
+	const userId = requireAuthenticatedUserId();
+
 	return db
 		.select({
 			id: locations.id,
@@ -153,10 +166,13 @@ export const getLocations = query(async () => {
 			color: locations.color
 		})
 		.from(locations)
+		.where(eq(locations.userId, userId))
 		.orderBy(asc(locations.name));
 });
 
 export const getSchedule = query(scheduleWeekSchema, async (week) => {
+	const userId = requireAuthenticatedUserId();
+
 	const weekStart = resolveWeekStart(week);
 	const weekEnd = weekStart.add({ days: 6 });
 
@@ -177,7 +193,12 @@ export const getSchedule = query(scheduleWeekSchema, async (week) => {
 		})
 		.from(shifts)
 		.innerJoin(locations, eq(shifts.locationId, locations.id))
-		.where(getShiftDateWindowWhere(weekStart.toString(), weekEnd.toString()))
+		.where(
+			and(
+				eq(shifts.userId, userId),
+				getShiftDateWindowWhere(weekStart.toString(), weekEnd.toString())
+			)
+		)
 		.orderBy(asc(shifts.shiftDate), asc(shifts.startTime));
 
 	const shiftIds = shiftRows.map((shift) => shift.id);
@@ -263,14 +284,41 @@ export type LocationOption = LocationsData[number];
 export type ScheduledShift = ScheduleData['shifts'][number];
 type RemoteIssue = Parameters<typeof invalid>[0];
 
+export const addLocation = form(addLocationSchema, async (data, issue) => {
+	const userId = requireAuthenticatedUserId();
+
+	const [existingLocation] = await db
+		.select({ id: locations.id })
+		.from(locations)
+		.where(and(eq(locations.userId, userId), eq(locations.name, data.name)))
+		.limit(1);
+
+	if (existingLocation) {
+		invalid(issue.name('This location already exists.'));
+	}
+
+	await db.insert(locations).values({
+		userId,
+		name: data.name,
+		color: data.color
+	});
+
+	await requested(getLocations, 1).refreshAll();
+
+	return {
+		success: true
+	};
+});
+
 async function validateLocation(
+	userId: string,
 	locationId: number,
 	issue: { locationId: (message: string) => RemoteIssue }
 ) {
 	const [location] = await db
 		.select({ id: locations.id })
 		.from(locations)
-		.where(eq(locations.id, locationId))
+		.where(and(eq(locations.id, locationId), eq(locations.userId, userId)))
 		.limit(1);
 
 	if (!location) {
@@ -279,6 +327,7 @@ async function validateLocation(
 }
 
 async function validateNoOverlap(
+	userId: string,
 	data: ShiftRule,
 	issue: {
 		startTime: (message: string) => RemoteIssue;
@@ -314,10 +363,14 @@ async function validateNoOverlap(
 		.where(
 			excludedShiftId
 				? and(
+						eq(shifts.userId, userId),
 						getShiftDateWindowWhere(overlapWindowStart, overlapWindowEnd),
 						ne(shifts.id, excludedShiftId)
 					)
-				: getShiftDateWindowWhere(overlapWindowStart, overlapWindowEnd)
+				: and(
+						eq(shifts.userId, userId),
+						getShiftDateWindowWhere(overlapWindowStart, overlapWindowEnd)
+					)
 		);
 	const existingShiftIds = existingShifts.map((shift) => shift.id);
 	const exceptionRows =
@@ -406,15 +459,18 @@ function hasRecurrencePatternChanged(existingShift: ShiftRule, updatedShift: Shi
 }
 
 export const addShift = form(addShiftSchema, async (data, issue) => {
+	const userId = requireAuthenticatedUserId();
+
 	const shiftDate = parseCanonicalDate(data.shiftDate);
 	if (!shiftDate) {
 		invalid(issue.shiftDate('Use a valid shift date.'));
 	}
 
-	await validateLocation(data.locationId, issue);
-	await validateNoOverlap(data, issue);
+	await validateLocation(userId, data.locationId, issue);
+	await validateNoOverlap(userId, data, issue);
 
 	await db.insert(shifts).values({
+		userId,
 		locationId: data.locationId,
 		shiftDate: data.shiftDate,
 		startTime: data.startTime,
@@ -437,6 +493,8 @@ export const addShift = form(addShiftSchema, async (data, issue) => {
 });
 
 export const editShift = form(editShiftSchema, async (data, issue) => {
+	const userId = requireAuthenticatedUserId();
+
 	const shiftDate = parseCanonicalDate(data.shiftDate);
 	if (!shiftDate) {
 		invalid(issue.shiftDate('Use a valid shift date.'));
@@ -453,15 +511,15 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 			recurrenceDays: shifts.recurrenceDays
 		})
 		.from(shifts)
-		.where(eq(shifts.id, data.id))
+		.where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)))
 		.limit(1);
 
 	if (!existingShift) {
 		invalid(issue.id('Choose an existing shift.'));
 	}
 
-	await validateLocation(data.locationId, issue);
-	await validateNoOverlap(data, issue, data.id);
+	await validateLocation(userId, data.locationId, issue);
+	await validateNoOverlap(userId, data, issue, data.id);
 
 	const shouldClearExceptions = hasRecurrencePatternChanged(existingShift, data);
 
@@ -478,7 +536,7 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 			recurrenceDays: data.recurrenceDays,
 			notes: data.notes
 		})
-		.where(eq(shifts.id, data.id));
+		.where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)));
 
 	if (shouldClearExceptions) {
 		await db.delete(shiftExceptions).where(eq(shiftExceptions.shiftId, data.id));
@@ -495,6 +553,8 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 });
 
 export const deleteShift = form(deleteShiftSchema, async (data, issue) => {
+	const userId = requireAuthenticatedUserId();
+
 	const occurrenceDate = parseCanonicalDate(data.occurrenceDate);
 	if (!occurrenceDate) {
 		invalid(issue.occurrenceDate('Use a valid shift date.'));
@@ -511,7 +571,7 @@ export const deleteShift = form(deleteShiftSchema, async (data, issue) => {
 			recurrenceDays: shifts.recurrenceDays
 		})
 		.from(shifts)
-		.where(eq(shifts.id, data.id))
+		.where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)))
 		.limit(1);
 
 	if (!existingShift) {
@@ -523,9 +583,9 @@ export const deleteShift = form(deleteShiftSchema, async (data, issue) => {
 			invalid(issue.occurrenceDate('Choose an existing shift occurrence.'));
 		}
 
-		await db.delete(shifts).where(eq(shifts.id, data.id));
+		await db.delete(shifts).where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)));
 	} else if (data.scope === 'series') {
-		await db.delete(shifts).where(eq(shifts.id, data.id));
+		await db.delete(shifts).where(and(eq(shifts.id, data.id), eq(shifts.userId, userId)));
 	} else {
 		const matchingOccurrence = getOccurrenceDatesInRange(
 			existingShift,

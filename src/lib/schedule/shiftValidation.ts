@@ -11,6 +11,25 @@ import { isClockInput } from '$lib/schedule/time';
 
 export const scheduleWeekSchema = v.nullish(v.string());
 export const deleteShiftScopeValues = ['single', 'series'] as const;
+export const locationColorValues = [
+	'#16a34a',
+	'#2563eb',
+	'#dc2626',
+	'#ea580c',
+	'#9333ea',
+	'#0891b2',
+	'#475569'
+] as const;
+
+export const addLocationSchema = v.object({
+	name: v.pipe(
+		v.string('Enter a location name.'),
+		v.trim(),
+		v.minLength(1, 'Enter a location name.'),
+		v.maxLength(80, 'Location names must be 80 characters or less.')
+	),
+	color: v.picklist(locationColorValues, 'Choose a location color.')
+});
 
 const shiftFormFields = {
 	locationId: v.pipe(

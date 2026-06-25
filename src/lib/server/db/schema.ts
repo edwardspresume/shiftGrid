@@ -14,24 +14,31 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { recurrenceFrequencyValues } from '../../schedule/constants';
+import { user } from './auth.schema';
 
 export const recurrenceFrequency = pgEnum('recurrence_frequency', recurrenceFrequencyValues);
 
-export const locations = pgTable('locations', {
-	id: serial('id').primaryKey(),
-	name: text('name').notNull(),
-	color: text('color').notNull().default('#16a34a'),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at')
-		.defaultNow()
-		.$onUpdate(() => new Date())
-		.notNull()
-});
+export const locations = pgTable(
+	'locations',
+	{
+		id: serial('id').primaryKey(),
+		userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		color: text('color').notNull().default('#16a34a'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at')
+			.defaultNow()
+			.$onUpdate(() => new Date())
+			.notNull()
+	},
+	(table) => [index('locations_user_id_idx').on(table.userId)]
+);
 
 export const shifts = pgTable(
 	'shifts',
 	{
 		id: serial('id').primaryKey(),
+		userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
 		locationId: integer('location_id')
 			.notNull()
 			.references(() => locations.id, { onDelete: 'restrict' }),
@@ -50,6 +57,7 @@ export const shifts = pgTable(
 			.notNull()
 	},
 	(table) => [
+		index('shifts_user_id_idx').on(table.userId),
 		index('shifts_location_id_idx').on(table.locationId),
 		index('shifts_shift_date_idx').on(table.shiftDate),
 		index('shifts_recurrence_frequency_idx').on(table.recurrenceFrequency)
@@ -81,11 +89,19 @@ export const shiftExceptions = pgTable(
 	]
 );
 
-export const locationsRelations = relations(locations, ({ many }) => ({
-	shifts: many(shifts)
+export const locationsRelations = relations(locations, ({ many, one }) => ({
+	shifts: many(shifts),
+	user: one(user, {
+		fields: [locations.userId],
+		references: [user.id]
+	})
 }));
 
 export const shiftsRelations = relations(shifts, ({ many, one }) => ({
+	user: one(user, {
+		fields: [shifts.userId],
+		references: [user.id]
+	}),
 	location: one(locations, {
 		fields: [shifts.locationId],
 		references: [locations.id]
@@ -98,6 +114,11 @@ export const shiftExceptionsRelations = relations(shiftExceptions, ({ one }) => 
 		fields: [shiftExceptions.shiftId],
 		references: [shifts.id]
 	})
+}));
+
+export const userScheduleRelations = relations(user, ({ many }) => ({
+	locations: many(locations),
+	shifts: many(shifts)
 }));
 
 export * from './auth.schema';
