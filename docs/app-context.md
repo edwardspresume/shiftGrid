@@ -39,8 +39,9 @@ The app is operational rather than marketing-focused: the main screen is the wor
 ## Data Model
 
 - `locations` stores `id`, `user_id`, `name`, `color`, and timestamps.
-- `locations` stores nullable `user_id` ownership. The owner seed claims unowned rows so existing demo locations become visible to the seeded owner.
-- `shifts` stores nullable `user_id` ownership plus the scheduling rule: location, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, and timestamps.
+- `locations` stores non-null `user_id` ownership. The ownership migration backfills existing rows to the first existing user, or removes only the known demo seed locations on empty fresh databases.
+- `shifts` stores non-null `user_id` ownership plus the scheduling rule: location, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, and timestamps.
+- `shifts` must reference a location owned by the same user through the composite `(user_id, location_id)` to `locations(user_id, id)` foreign key.
 - `shift_exceptions` stores per-occurrence changes for recurring series. It currently supports constrained `cancelled` occurrences.
 - Better Auth tables (`user`, `session`, `account`, `verification`) support email/password login. Password credentials are stored in `account` rows with `provider_id = 'credential'`.
 
@@ -51,10 +52,11 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Schedule queries and mutations require an authenticated Better Auth session and only read/write rows owned by `locals.user.id`.
 - `getSchedule(week)` returns only the requested week's expanded shift occurrences and weekly summary.
 - `getLocations()` is separate from `getSchedule()` so adding a shift refreshes only schedule data instead of reloading relatively static location data.
-- `addLocation` validates a user-owned location name/color, blocks duplicate names for the current user, inserts with `locals.user.id`, and refreshes `getLocations()`.
+- `addLocation` validates a user-owned location name/color, relies on the per-user unique location-name constraint to block duplicates, inserts with `locals.user.id`, and refreshes `getLocations()`.
 - `addShift` validates input, checks location existence, checks overlap windows, inserts the shift rule, and accepts one requested `getSchedule` refresh.
 - `editShift` validates the same scheduling rules, excludes the edited rule during overlap checks, updates the stored rule, clears cancellation exceptions when the recurrence pattern changes, and accepts one requested `getSchedule` refresh.
 - `deleteShift` deletes one-time shifts directly, deletes recurring series directly, or creates a cancelled occurrence exception for a single recurring shift.
+- Shift add/edit/delete operations run inside a pooled Postgres transaction with a per-user advisory transaction lock so overlap validation and writes are serialized for each user.
 - Shift forms submit with `form.submit().updates(getSchedule(currentWeekQuery))`, keeping refresh scoped to the visible schedule query and avoiding a full app invalidation.
 
 ## Important Source Areas

@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
 	check,
 	date,
+	foreignKey,
 	index,
 	integer,
 	pgEnum,
@@ -22,7 +23,9 @@ export const locations = pgTable(
 	'locations',
 	{
 		id: serial('id').primaryKey(),
-		userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
 		color: text('color').notNull().default('#16a34a'),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -31,14 +34,20 @@ export const locations = pgTable(
 			.$onUpdate(() => new Date())
 			.notNull()
 	},
-	(table) => [index('locations_user_id_idx').on(table.userId)]
+	(table) => [
+		index('locations_user_id_idx').on(table.userId),
+		uniqueIndex('locations_user_id_id_unique').on(table.userId, table.id),
+		uniqueIndex('locations_user_id_name_unique').on(table.userId, table.name)
+	]
 );
 
 export const shifts = pgTable(
 	'shifts',
 	{
 		id: serial('id').primaryKey(),
-		userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
 		locationId: integer('location_id')
 			.notNull()
 			.references(() => locations.id, { onDelete: 'restrict' }),
@@ -60,7 +69,12 @@ export const shifts = pgTable(
 		index('shifts_user_id_idx').on(table.userId),
 		index('shifts_location_id_idx').on(table.locationId),
 		index('shifts_shift_date_idx').on(table.shiftDate),
-		index('shifts_recurrence_frequency_idx').on(table.recurrenceFrequency)
+		index('shifts_recurrence_frequency_idx').on(table.recurrenceFrequency),
+		foreignKey({
+			name: 'shifts_user_id_location_id_locations_user_id_id_fk',
+			columns: [table.userId, table.locationId],
+			foreignColumns: [locations.userId, locations.id]
+		}).onDelete('restrict')
 	]
 );
 

@@ -20,6 +20,7 @@
 		name: '',
 		color: locationColorValues[0]
 	};
+	let selectedColor = $state<(typeof locationColorValues)[number]>(defaultFormValues.color);
 
 	const fieldClass =
 		'w-full rounded-lg border-input bg-background text-sm shadow-sm transition-colors focus:border-ring focus:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground disabled:opacity-70';
@@ -28,6 +29,7 @@
 
 	function resetForm(element: HTMLFormElement) {
 		element.reset();
+		selectedColor = defaultFormValues.color;
 		addLocation.fields.set(defaultFormValues);
 	}
 </script>
@@ -79,7 +81,7 @@
 						<input
 							{...addLocation.fields.color.as('radio', color)}
 							class="sr-only"
-							checked={color === defaultFormValues.color}
+							bind:group={selectedColor}
 						/>
 						<span class="size-6 rounded-full border shadow-sm" style:background-color={color}
 						></span>
