@@ -20,7 +20,7 @@ The app is operational rather than marketing-focused: the main screen is the wor
 - Schedulers create and manage shared team members from the `/team-members` page.
 - The team members page supports create, edit, and delete for unassigned team members.
 - Team members assigned to existing shift rows cannot be deleted; edit their name/color or remove their shifts first.
-- Shift form fields for team member, date, break, start time, end time, recurrence, repeat-until, selected days, and shift notes.
+- Shift form fields for team member, date, start time, end time, recurrence, repeat-until, selected days, and shift notes.
 - Recurring shift forms include repeat-until presets for 2 weeks, 1 month, and 3 months while keeping the exact date input editable.
 - Shift cards show team member, recurrence label, time range, total hours, and notes when present.
 - Shift cards include a three-dot actions menu with edit and delete actions.
@@ -45,9 +45,11 @@ The app is operational rather than marketing-focused: the main screen is the wor
 
 ## Data Model
 
+- Database scripts read `DATABASE_URL` from dotenv files. `pnpm db:migrate` uses `.env`, `pnpm db:migrate:test` uses `.env.test`, and `pnpm db:migrate:production` uses `.env.production`.
+- `pnpm db:copy:test-to-production` replaces production users and scheduling data with rows from test using `.env.test` and `.env.production`. It copies `user`, `account`, `team_members`, `shifts`, and shift exception child rows, truncates sessions, and does not copy live session rows.
 - `user.role` stores the role enum used for application-level permissions.
 - `team_members` stores the shared assignable people list: `id`, `name`, `color`, audit user ids, and timestamps.
-- `shifts` stores the scheduling rule: `team_member_id`, base date, start/end time, break minutes, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, audit user ids, and timestamps.
+- `shifts` stores the scheduling rule: `team_member_id`, base date, start/end time, recurrence frequency, recurrence-until, recurrence weekdays, optional shift notes, audit user ids, and timestamps.
 - `shifts.team_member_id` references the shared `team_members` table. Shift overlap validation is scoped to that team member.
 - `shift_exceptions` stores per-occurrence changes for recurring series. It currently supports constrained `cancelled` occurrences.
 - Better Auth tables (`user`, `session`, `account`, `verification`) support email/password login. Password credentials are stored in `account` rows with `provider_id = 'credential'`.

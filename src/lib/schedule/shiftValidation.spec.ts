@@ -17,7 +17,6 @@ const validShift = {
 	shiftDate: '2026-06-24',
 	startTime: '09:00',
 	endTime: '17:00',
-	breakMinutes: '0',
 	recurrenceFrequency: 'none',
 	recurrenceUntil: '',
 	recurrenceDays: ['3'],
@@ -33,7 +32,6 @@ describe('addShiftSchema', () => {
 
 		expect(result.output).toMatchObject({
 			teamMemberId: 1,
-			breakMinutes: 0,
 			recurrenceFrequency: 'none',
 			recurrenceUntil: null,
 			recurrenceDays: [3],
@@ -67,15 +65,6 @@ describe('addShiftSchema', () => {
 
 		expect(result.success).toBe(false);
 		expect(parseCanonicalDate('0000-01-01')).toBeNull();
-	});
-
-	it('rejects invalid break values instead of silently defaulting them', () => {
-		const result = v.safeParse(addShiftSchema, {
-			...validShift,
-			breakMinutes: '999'
-		});
-
-		expect(result.success).toBe(false);
 	});
 
 	it('rejects recurrence end dates before the shift date', () => {
@@ -204,7 +193,7 @@ describe('addShiftSchema', () => {
 		expect(isClockInput('09:00:00')).toBe(false);
 		expect(normalizeClockInput('09:00:00')).toBe('09:00');
 		expect(formatClockTime('17:00')).toBe('5:00 PM');
-		expect(getShiftHours('22:00', '06:00', 30)).toBe(7.5);
+		expect(getShiftHours('22:00', '06:00')).toBe(8);
 	});
 
 	it('detects overlapping shift time ranges without blocking adjacent shifts', () => {

@@ -9,8 +9,6 @@
 		DialogTitle
 	} from '$lib/components/ui/dialog';
 	import {
-		breakMinuteLabels,
-		breakMinuteOptions,
 		RECURRENCE_LIMIT_YEARS,
 		recurrenceDayLabels,
 		recurrenceDayValues,
@@ -27,7 +25,7 @@
 		getShiftHours
 	} from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
-	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound, Utensils } from '@lucide/svelte';
+	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound } from '@lucide/svelte';
 
 	type RepeatUntilPreset = {
 		label: string;
@@ -68,9 +66,6 @@
 	const shiftDate = $derived(String(addShift.fields.shiftDate.value() || initialDate));
 	const startTime = $derived(String(addShift.fields.startTime.value() || DEFAULT_START_TIME));
 	const endTime = $derived(String(addShift.fields.endTime.value() || DEFAULT_END_TIME));
-	const breakMinutes = $derived(
-		String(addShift.fields.breakMinutes.value() || breakMinuteOptions[0])
-	);
 	const recurrenceFrequency = $derived(
 		String(addShift.fields.recurrenceFrequency.value() || recurrenceFrequencyValues[0])
 	);
@@ -86,7 +81,6 @@
 		shiftDate: initialDate,
 		startTime: DEFAULT_START_TIME,
 		endTime: DEFAULT_END_TIME,
-		breakMinutes: breakMinuteOptions[0],
 		recurrenceFrequency: recurrenceFrequencyValues[0],
 		recurrenceUntil: '',
 		recurrenceDays: [getRecurrenceDayValue(initialDate)],
@@ -100,7 +94,7 @@
 		addShift.fields.set(defaultFormValues);
 	});
 
-	const totalHours = $derived(getShiftHours(startTime, endTime, Number(breakMinutes)));
+	const totalHours = $derived(getShiftHours(startTime, endTime));
 	const formattedHours = $derived(formatCompactHours(totalHours));
 	const formattedTimeRange = $derived(
 		`${formatClockTime(startTime)} - ${formatClockTime(endTime)}`
@@ -145,7 +139,6 @@
 			shiftDate,
 			startTime,
 			endTime,
-			breakMinutes: breakMinutes as (typeof breakMinuteOptions)[number],
 			recurrenceFrequency: recurrenceFrequency as (typeof recurrenceFrequencyValues)[number],
 			recurrenceUntil: presetDate,
 			recurrenceDays: getCurrentRecurrenceDays(),
@@ -184,7 +177,7 @@
 	<DialogHeader class="border-b p-4">
 		<DialogTitle>Add shift</DialogTitle>
 		<DialogDescription class="sr-only">
-			Create a scheduled shift with team member, date, time, break, recurrence, and notes.
+			Create a scheduled shift with team member, date, time, recurrence, and notes.
 		</DialogDescription>
 		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
 	</DialogHeader>
@@ -231,26 +224,6 @@
 					/>
 				</span>
 				{#each addShift.fields.shiftDate.issues() ?? [] as issue (issue.message)}
-					<p class={issueClass}>{issue.message}</p>
-				{/each}
-			</label>
-
-			<label class="space-y-2">
-				<span class={labelClass}>Break</span>
-				<span class="relative block">
-					<Utensils
-						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<select
-						{...addShift.fields.breakMinutes.as('select', breakMinuteOptions[0])}
-						class={`${fieldClass} pl-9`}
-					>
-						{#each breakMinuteOptions as option (option)}
-							<option value={option}>{breakMinuteLabels[option]}</option>
-						{/each}
-					</select>
-				</span>
-				{#each addShift.fields.breakMinutes.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>
@@ -352,10 +325,7 @@
 						<label
 							class="flex min-h-10 items-center justify-center rounded-lg border bg-background px-2 text-xs font-semibold transition-colors has-checked:border-primary has-checked:bg-primary/10 has-checked:text-primary"
 						>
-							<input
-								{...addShift.fields.recurrenceDays.as('checkbox', option)}
-								class="sr-only"
-							/>
+							<input {...addShift.fields.recurrenceDays.as('checkbox', option)} class="sr-only" />
 							{recurrenceDayLabels[option]}
 						</label>
 					{/each}

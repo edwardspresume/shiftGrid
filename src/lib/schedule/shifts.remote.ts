@@ -217,7 +217,6 @@ export const getSchedule = query(scheduleWeekSchema, async (week) => {
 			shiftDate: shifts.shiftDate,
 			startTime: shifts.startTime,
 			endTime: shifts.endTime,
-			breakMinutes: shifts.breakMinutes,
 			recurrenceFrequency: shifts.recurrenceFrequency,
 			recurrenceUntil: shifts.recurrenceUntil,
 			recurrenceDays: shifts.recurrenceDays,
@@ -261,7 +260,7 @@ export const getSchedule = query(scheduleWeekSchema, async (week) => {
 		.flatMap((shift) => {
 			const startTime = normalizeClockInput(shift.startTime);
 			const endTime = normalizeClockInput(shift.endTime);
-			const hours = getShiftHours(startTime, endTime, shift.breakMinutes);
+			const hours = getShiftHours(startTime, endTime);
 			const cancelledDates = cancelledOccurrences.get(shift.id) ?? new Set<string>();
 
 			return getOccurrenceDatesInRange(shift, weekStart, weekEnd)
@@ -276,7 +275,6 @@ export const getSchedule = query(scheduleWeekSchema, async (week) => {
 					teamMemberColor: shift.teamMemberColor,
 					startTime,
 					endTime,
-					breakMinutes: shift.breakMinutes,
 					recurrenceFrequency: shift.recurrenceFrequency,
 					recurrenceUntil: shift.recurrenceUntil,
 					recurrenceDays: shift.recurrenceDays,
@@ -600,7 +598,6 @@ export const addShift = form(addShiftSchema, async (data, issue) => {
 					shiftDate: oneTimeShiftDate.toString(),
 					startTime: data.startTime,
 					endTime: data.endTime,
-					breakMinutes: data.breakMinutes,
 					recurrenceFrequency: 'none' as const,
 					recurrenceUntil: null,
 					recurrenceDays: null,
@@ -617,7 +614,6 @@ export const addShift = form(addShiftSchema, async (data, issue) => {
 				shiftDate: data.shiftDate,
 				startTime: data.startTime,
 				endTime: data.endTime,
-				breakMinutes: data.breakMinutes,
 				recurrenceFrequency: data.recurrenceFrequency,
 				recurrenceUntil: data.recurrenceUntil,
 				recurrenceDays: data.recurrenceDays,
@@ -705,7 +701,6 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 				shiftDate: data.shiftDate,
 				startTime: data.startTime,
 				endTime: data.endTime,
-				breakMinutes: data.breakMinutes,
 				recurrenceFrequency: 'none',
 				recurrenceUntil: null,
 				recurrenceDays: null,
@@ -725,7 +720,6 @@ export const editShift = form(editShiftSchema, async (data, issue) => {
 					shiftDate: data.shiftDate,
 					startTime: data.startTime,
 					endTime: data.endTime,
-					breakMinutes: data.breakMinutes,
 					recurrenceFrequency: data.recurrenceFrequency,
 					recurrenceUntil: data.recurrenceUntil,
 					recurrenceDays: data.recurrenceDays,

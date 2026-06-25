@@ -1,7 +1,6 @@
 import * as v from 'valibot';
 
 import {
-	breakMinuteOptions,
 	RECURRENCE_LIMIT_YEARS,
 	recurrenceDayValues,
 	recurrenceFrequencyValues
@@ -77,10 +76,6 @@ const shiftFormFields = {
 		v.minLength(1, 'Choose an end time.'),
 		v.check(isClockInput, 'Use a valid end time.')
 	),
-	breakMinutes: v.pipe(
-		v.picklist(breakMinuteOptions, 'Choose a valid break.'),
-		v.transform(Number)
-	),
 	recurrenceFrequency: v.picklist(recurrenceFrequencyValues, 'Choose a valid recurrence.'),
 	recurrenceUntil: v.pipe(
 		v.fallback(v.string(), ''),
@@ -137,10 +132,7 @@ export const addShiftSchema = v.pipe(
 		['recurrenceUntil']
 	),
 	v.forward(
-		v.check(
-			({ recurrenceDays }) => recurrenceDays.length > 0,
-			'Choose at least one shift day.'
-		),
+		v.check(({ recurrenceDays }) => recurrenceDays.length > 0, 'Choose at least one shift day.'),
 		['recurrenceDays']
 	),
 	v.transform((data) => ({

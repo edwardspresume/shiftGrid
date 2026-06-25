@@ -9,8 +9,6 @@
 		DialogTitle
 	} from '$lib/components/ui/dialog';
 	import {
-		breakMinuteLabels,
-		breakMinuteOptions,
 		RECURRENCE_LIMIT_YEARS,
 		recurrenceDayLabels,
 		recurrenceDayValues,
@@ -27,7 +25,7 @@
 	} from '$lib/schedule/shifts.remote';
 	import { formatClockTime, formatCompactHours, getShiftHours } from '$lib/schedule/time';
 	import { DEFAULT_WEEK_STARTS_ON, getWeekStart } from '$lib/schedule/week';
-	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound, Utensils } from '@lucide/svelte';
+	import { CalendarDays, Clock3, NotebookPen, Repeat2, UserRound } from '@lucide/svelte';
 
 	type EditScope = 'single' | 'series';
 	type RepeatUntilPreset = {
@@ -75,9 +73,6 @@
 	);
 	const startTime = $derived(String(editShift.fields.startTime.value() || shift.startTime));
 	const endTime = $derived(String(editShift.fields.endTime.value() || shift.endTime));
-	const breakMinutes = $derived(
-		String(editShift.fields.breakMinutes.value() || shift.breakMinutes)
-	);
 	const recurrenceFrequency = $derived(
 		String(editShift.fields.recurrenceFrequency.value() || shift.recurrenceFrequency)
 	);
@@ -98,7 +93,7 @@
 		editShift.fields.set(getDefaultFormValues(nextScope));
 	});
 
-	const totalHours = $derived(getShiftHours(startTime, endTime, Number(breakMinutes)));
+	const totalHours = $derived(getShiftHours(startTime, endTime));
 	const formattedHours = $derived(formatCompactHours(totalHours));
 	const formattedTimeRange = $derived(
 		`${formatClockTime(startTime)} - ${formatClockTime(endTime)}`
@@ -137,7 +132,6 @@
 			shiftDate: activeShiftDate,
 			startTime: shift.startTime,
 			endTime: shift.endTime,
-			breakMinutes: shift.breakMinutes.toString() as (typeof breakMinuteOptions)[number],
 			recurrenceFrequency: (isSingleOccurrence
 				? 'none'
 				: shift.recurrenceFrequency) as RecurrenceFrequency,
@@ -185,7 +179,6 @@
 			shiftDate,
 			startTime,
 			endTime,
-			breakMinutes: breakMinutes as (typeof breakMinuteOptions)[number],
 			recurrenceFrequency: recurrenceFrequency as RecurrenceFrequency,
 			recurrenceUntil: presetDate,
 			recurrenceDays: getCurrentRecurrenceDays(),
@@ -227,7 +220,7 @@
 	<DialogHeader class="border-b p-4">
 		<DialogTitle>Edit shift</DialogTitle>
 		<DialogDescription class="sr-only">
-			Update a scheduled shift with team member, date, time, break, recurrence, and notes.
+			Update a scheduled shift with team member, date, time, recurrence, and notes.
 		</DialogDescription>
 		<p class="text-sm font-medium text-muted-foreground">{formattedHours} total</p>
 	</DialogHeader>
@@ -318,29 +311,6 @@
 					/>
 				</span>
 				{#each editShift.fields.shiftDate.issues() ?? [] as issue (issue.message)}
-					<p class={issueClass}>{issue.message}</p>
-				{/each}
-			</label>
-
-			<label class="space-y-2">
-				<span class={labelClass}>Break</span>
-				<span class="relative block">
-					<Utensils
-						class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<select
-						{...editShift.fields.breakMinutes.as(
-							'select',
-							shift.breakMinutes.toString() as (typeof breakMinuteOptions)[number]
-						)}
-						class={`${fieldClass} pl-9`}
-					>
-						{#each breakMinuteOptions as option (option)}
-							<option value={option}>{breakMinuteLabels[option]}</option>
-						{/each}
-					</select>
-				</span>
-				{#each editShift.fields.breakMinutes.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
 				{/each}
 			</label>

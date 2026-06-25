@@ -26,15 +26,3 @@ export const recurrenceDayLabels = {
 	'5': 'Fri',
 	'6': 'Sat'
 } satisfies Record<RecurrenceDayValue, string>;
-
-export const breakMinuteOptions = ['0', '15', '30', '45', '60'] as const;
-
-export type BreakMinuteOption = (typeof breakMinuteOptions)[number];
-
-export const breakMinuteLabels = {
-	'0': 'No break',
-	'15': '15 minutes',
-	'30': '30 minutes',
-	'45': '45 minutes',
-	'60': '60 minutes'
-} satisfies Record<BreakMinuteOption, string>;

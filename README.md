@@ -29,6 +29,35 @@ npm run dev
 npm run dev -- --open
 ```
 
+## Database migrations
+
+The app and migration scripts read the database connection from `DATABASE_URL`.
+Use separate local env files for each target database:
+
+```sh
+cp .env.example .env.test
+cp .env.example .env.production
+```
+
+Set `DATABASE_URL` in each file to the matching test or production database.
+Then run:
+
+```sh
+pnpm db:migrate:test
+pnpm db:migrate:production
+```
+
+To replace production users and scheduling data with test data after both schemas are migrated, run:
+
+```sh
+pnpm db:copy:test-to-production
+```
+
+That command truncates production `user`, `account`, `session`, `team_members`, `shifts`, and
+`shift_exceptions` data before copying `user`, `account`, `team_members`, `shifts`, and
+`shift_exceptions` rows from `.env.test`. It does not copy live sessions, so users may need to
+sign in again.
+
 ## Building
 
 To create a production version of your app:

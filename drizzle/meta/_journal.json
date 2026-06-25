@@ -57,6 +57,13 @@
       "when": 1782441600000,
       "tag": "0007_add_roles_and_team_members",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782490200000,
+      "tag": "0008_remove_shift_break_minutes",
+      "breakpoints": true
     }
   ]
 }

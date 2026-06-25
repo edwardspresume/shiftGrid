@@ -62,7 +62,7 @@ export function shiftMinuteRangesOverlap(
 	return first.start < second.end && second.start < first.end;
 }
 
-export function getShiftHours(startTime: string, endTime: string, breakMinutes: number) {
+export function getShiftHours(startTime: string, endTime: string) {
 	const startMinutes = getClockMinutes(startTime);
 	let endMinutes = getClockMinutes(endTime);
 
@@ -70,7 +70,7 @@ export function getShiftHours(startTime: string, endTime: string, breakMinutes: 
 		endMinutes += 24 * 60;
 	}
 
-	return Math.max((endMinutes - startMinutes - breakMinutes) / 60, 0);
+	return Math.max((endMinutes - startMinutes) / 60, 0);
 }
 
 export function formatClockTime(value: string) {
