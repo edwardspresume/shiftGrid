@@ -45,8 +45,16 @@
 		<Popover.Root bind:open>
 			<Popover.Trigger>
 				{#snippet child({ props })}
-					<Button {...props} variant="ghost" title="Jump to date" aria-label="Jump to date">
-						<span class="font-heading text-sm leading-none font-semibold">{rangeLabel}</span>
+					<Button
+						{...props}
+						variant="ghost"
+						class="w-32 justify-center sm:w-44"
+						title="Jump to date"
+						aria-label="Jump to date"
+					>
+						<span class="min-w-0 text-center font-heading text-sm leading-none font-semibold">
+							{rangeLabel}
+						</span>
 						<CalendarDays class="size-4" />
 					</Button>
 				{/snippet}

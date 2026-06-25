@@ -215,6 +215,25 @@ test('does not expose team member creation on the schedule page', async ({ page 
 	await expect(page.getByRole('button', { name: 'Add team member' })).toHaveCount(0);
 });
 
+test('keeps the week selector width stable while changing weeks', async ({ page }) => {
+	await page.goto('/?week=2026-01-25');
+
+	const jumpButton = page.getByRole('button', { name: 'Jump to date' });
+	const nextWeekButton = page.getByRole('button', { name: 'Next week' });
+	await expect(jumpButton).toContainText('Jan 25-31, 2026');
+
+	const initialBox = await jumpButton.boundingBox();
+	if (!initialBox) throw new Error('Expected week selector button to be visible');
+
+	await nextWeekButton.click();
+	await expect(jumpButton).toContainText('Feb 1-7, 2026');
+
+	const nextBox = await jumpButton.boundingBox();
+	if (!nextBox) throw new Error('Expected week selector button to remain visible');
+
+	expect(nextBox.width).toBeCloseTo(initialBox.width, 0);
+});
+
 test('creates a team member and schedules a shift for them', async ({ page }) => {
 	const shiftDate = getIsolatedFutureSunday();
 	const teamMemberName = `E2E Member ${Date.now()}`;
