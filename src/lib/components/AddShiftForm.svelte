@@ -282,36 +282,38 @@
 				{/each}
 			</label>
 
-			<div class={['space-y-2', !isRecurring && 'opacity-60']}>
-				<label class="block space-y-2">
-					<span class={labelClass}>Repeat until</span>
-					<input
-						{...addShift.fields.recurrenceUntil.as('date')}
-						class={fieldClass}
-						disabled={!isRecurring}
-						required={isRecurring}
-						min={shiftDate}
-						max={repeatUntilMax}
-					/>
-				</label>
-				<div class="grid grid-cols-3 gap-1.5">
-					{#each repeatUntilPresets as preset (preset.label)}
-						{@const presetValue = getPresetRepeatUntil(preset)}
-						<button
-							type="button"
-							class={[
-								'min-h-8 rounded-lg border px-2 text-xs font-semibold transition-colors',
-								recurrenceUntil === presetValue
-									? 'border-primary bg-primary/10 text-primary'
-									: 'bg-background hover:bg-muted/50'
-							]}
-							aria-pressed={recurrenceUntil === presetValue}
-							disabled={!isRecurring || !presetValue}
-							onclick={() => applyRepeatUntilPreset(preset)}
-						>
-							{preset.label}
-						</button>
-					{/each}
+			<div class={['space-y-2 md:col-span-2', !isRecurring && 'opacity-60']}>
+				<div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+					<label class="block space-y-2">
+						<span class={labelClass}>Repeat until</span>
+						<input
+							{...addShift.fields.recurrenceUntil.as('date')}
+							class={fieldClass}
+							disabled={!isRecurring}
+							required={isRecurring}
+							min={shiftDate}
+							max={repeatUntilMax}
+						/>
+					</label>
+					<div class="grid grid-cols-3 gap-1.5 sm:w-60">
+						{#each repeatUntilPresets as preset (preset.label)}
+							{@const presetValue = getPresetRepeatUntil(preset)}
+							<button
+								type="button"
+								class={[
+									'min-h-10 rounded-lg border px-2 text-xs font-semibold transition-colors',
+									recurrenceUntil === presetValue
+										? 'border-primary bg-primary/10 text-primary'
+										: 'bg-background hover:bg-muted/50'
+								]}
+								aria-pressed={recurrenceUntil === presetValue}
+								disabled={!isRecurring || !presetValue}
+								onclick={() => applyRepeatUntilPreset(preset)}
+							>
+								{preset.label}
+							</button>
+						{/each}
+					</div>
 				</div>
 				{#each addShift.fields.recurrenceUntil.issues() ?? [] as issue (issue.message)}
 					<p class={issueClass}>{issue.message}</p>
