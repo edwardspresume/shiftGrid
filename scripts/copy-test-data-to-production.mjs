@@ -17,8 +17,11 @@ const productionEnv = dotenv.parse(readFileSync('.env.production'));
 const testDatabaseUrl = testEnv.DATABASE_URL;
 const productionDatabaseUrl = productionEnv.DATABASE_URL;
 
+const e2eUserEmail = testEnv.E2E_TEST_EMAIL?.trim().toLowerCase();
+
 if (!testDatabaseUrl) throw new Error('.env.test DATABASE_URL is not set');
 if (!productionDatabaseUrl) throw new Error('.env.production DATABASE_URL is not set');
+if (!e2eUserEmail) throw new Error('.env.test E2E_TEST_EMAIL is not set');
 if (testDatabaseUrl === productionDatabaseUrl) {
 	throw new Error('Refusing to copy data because test and production DATABASE_URL are identical');
 }
@@ -100,7 +103,6 @@ const truncateTableNames = [
 
 const serialTables = ['team_members', 'shifts', 'shift_exceptions'];
 const chunkSize = 100;
-const e2eUserEmail = 'e2e@shiftgrid.local';
 const e2eTeamMemberPrefix = 'E2E ';
 
 const quoteIdentifier = (identifier) => `"${identifier.replaceAll('"', '""')}"`;

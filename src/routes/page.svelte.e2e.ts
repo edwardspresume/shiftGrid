@@ -8,8 +8,18 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { account, user } from '../lib/server/db/auth.schema';
 import { shifts, teamMembers } from '../lib/server/db/schema';
 
-const E2E_EMAIL = 'e2e@shiftgrid.local';
-const E2E_PASSWORD = 'ShiftGridE2E123!';
+function requireTestCredential(name: 'E2E_TEST_EMAIL' | 'E2E_TEST_PASSWORD') {
+	const value = process.env[name]?.trim();
+
+	if (!value) {
+		throw new Error(`${name} is not set; define it in .env.test`);
+	}
+
+	return value;
+}
+
+const E2E_EMAIL = requireTestCredential('E2E_TEST_EMAIL');
+const E2E_PASSWORD = requireTestCredential('E2E_TEST_PASSWORD');
 const createdTeamMemberNames = new Set<string>();
 
 test.describe.configure({ mode: 'serial' });
